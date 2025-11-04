@@ -16,6 +16,7 @@ import { format, startOfToday } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { GamificationCard } from '@/components/gamification/GamificationCard';
 import { calculateAndApplyTimeAdjustment, formatDelay, formatPenalty } from '@/lib/gamification/time-adjustment-service';
+import { AISuggestionsDashboard } from '@/components/ai/AISuggestionsDashboard';
 
 interface TimeAdjustmentNotification {
   show: boolean;
@@ -234,6 +235,13 @@ export default function DashboardPage() {
             </CardHeader>
         </Card>
 
+        {/* AI Suggestions Dashboard - Highly visible section */}
+        <AISuggestionsDashboard 
+            userId={user?.id}
+            showHeader={true}
+            compact={false}
+        />
+
         <div className="grid gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2 space-y-6">
                 <GamificationCard />
@@ -329,7 +337,7 @@ export default function DashboardPage() {
                                             </AlertDialogHeader>
                                             <AlertDialogFooter>
                                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => handleDelete(block.id)} variant="destructive">Delete</AlertDialogAction>
+                                                <AlertDialogAction onClick={() => handleDelete(block.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
                                             </AlertDialogFooter>
                                         </AlertDialogContent>
                                     </AlertDialog>

@@ -1,674 +1,196 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { BrainCircuit, Plus, Clock, Zap, Search, Trash2, MessageSquare, Settings, Book } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/use-auth-listener';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, MessageCircle, Brain, Settings, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { useToast } from '@/hooks/use-toast';
-import { GeneralChatMessage, Conversation, SendMessageRequest, CreateConversationRequest } from '@/types/chat';
-import { formatDistanceToNow } from 'date-fns';
-import crypto from 'crypto';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import GeneralChat from '@/components/chat/GeneralChat';
+import StudyBuddy from '@/components/chat/StudyBuddy';
 
-interface ChatPageProps {}
-
-function ChatPageContent({}: ChatPageProps) {
-  const searchParams = useSearchParams();
+export default function ChatPage() {
+  const { user } = useAuth();
   const router = useRouter();
-  const { toast } = useToast();
-  
-  // State management
-  const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [messages, setMessages] = useState<GeneralChatMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  const [inputMessage, setInputMessage] = useState('');
-  const [isConversationsOpen, setIsConversationsOpen] = useState(false);
-  const [retryCountdown, setRetryCountdown] = useState(0);
-  const [isFirstMessage, setIsFirstMessage] = useState(true);
-  
-  // Mock user ID - in production, get from auth
-  const userId = '550e8400-e29b-41d4-a716-446655440000';
+  const [activeChat, setActiveChat] = useState<'general' | 'study' | null>(null);
+  const [userId, setUserId] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const countdownRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Load conversations on mount
   useEffect(() => {
-    loadConversations();
-  }, []);
-
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  // Handle retry countdown
-  useEffect(() => {
-    if (retryCountdown > 0) {
-      countdownRef.current = setTimeout(() => {
-        setRetryCountdown(prev => prev - 1);
-      }, 1000);
-    } else if (countdownRef.current) {
-      clearTimeout(countdownRef.current);
-    }
-
-    return () => {
-      if (countdownRef.current) {
-        clearTimeout(countdownRef.current);
-      }
-    };
-  }, [retryCountdown]);
-
-  const loadConversations = async () => {
-    try {
-      const response = await fetch(`/api/chat/conversations?userId=${userId}&chatType=general`);
-      const data = await response.json();
-      
-      if (data.success) {
-        setConversations(data.data);
-        
-        // Auto-select first conversation if none selected
-        if (!currentConversation && data.data.length > 0) {
-          selectConversation(data.data[0]);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading conversations:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load conversations',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const selectConversation = async (conversation: Conversation) => {
-    setIsLoading(true);
-    setCurrentConversation(conversation);
-    setIsFirstMessage(false);
-    
-    try {
-      const response = await fetch(`/api/chat/messages?conversationId=${conversation.id}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        setMessages(data.data.messages);
-        setIsFirstMessage(data.data.messages.length === 0);
-      }
-    } catch (error) {
-      console.error('Error loading messages:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load messages',
-        variant: 'destructive',
-      });
-    } finally {
+    // Simulate loading for demo purposes
+    setTimeout(() => {
       setIsLoading(false);
-    }
-  };
-
-  const createNewConversation = async () => {
-    try {
-      const requestData: CreateConversationRequest = {
-        userId,
-        chatType: 'general'
-      };
-
-      const response = await fetch('/api/chat/conversations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        const newConversation: Conversation = {
-          id: data.data.conversationId,
-          title: data.data.title,
-          chatType: data.data.chatType,
-          createdAt: data.data.created_at,
-          updatedAt: data.data.created_at
-        };
-        
-        setCurrentConversation(newConversation);
-        setMessages([]);
-        setIsFirstMessage(true);
-        setConversations(prev => [newConversation, ...prev]);
-        
-        toast({
-          title: 'New conversation',
-          description: 'Started a fresh conversation',
-        });
-      }
-    } catch (error) {
-      console.error('Error creating conversation:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to create new conversation',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const deleteConversation = async (conversationId: string) => {
-    try {
-      const response = await fetch(`/api/chat/conversations/${conversationId}`, {
-        method: 'DELETE',
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        setConversations(prev => prev.filter(c => c.id !== conversationId));
-        
-        // If this was the current conversation, clear it
-        if (currentConversation?.id === conversationId) {
-          setCurrentConversation(null);
-          setMessages([]);
-          setIsFirstMessage(true);
-        }
-        
-        toast({
-          title: 'Conversation deleted',
-          description: 'The conversation has been permanently deleted.',
-        });
-      }
-    } catch (error) {
-      console.error('Error deleting conversation:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete conversation',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const sendMessage = async () => {
-    if (!inputMessage.trim() || isSending || retryCountdown > 0) return;
-
-    // Create new conversation if needed
-    if (!currentConversation) {
-      await createNewConversation();
-      // Wait a bit for conversation to be created
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-
-    const messageText = inputMessage.trim();
-    setInputMessage('');
-    setIsSending(true);
-    setIsFirstMessage(false);
-
-    // Add user message to UI immediately
-    const userMessage: GeneralChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: messageText,
-      timestamp: new Date().toISOString()
-    };
-    
-    setMessages(prev => [...prev, userMessage]);
-
-    // Add loading message
-    const loadingMessage: GeneralChatMessage = {
-      id: 'loading',
-      role: 'assistant',
-      content: '',
-      timestamp: new Date().toISOString(),
-      isLoading: true
-    };
-    
-    setMessages(prev => [...prev, loadingMessage]);
-
-    try {
-      const requestData: SendMessageRequest = {
-        userId,
-        conversationId: currentConversation?.id || conversations[0]?.id || '',
-        message: messageText,
-        chatType: 'general'
-      };
-
-      const response = await fetch('/api/chat/general/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-      });
-
-      const data = await response.json();
-
-      // Remove loading message
-      setMessages(prev => prev.filter(m => m.id !== 'loading'));
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send message');
-      }
-
-      if (data.success) {
-        const aiMessage: GeneralChatMessage = {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: data.data.response.content,
-          timestamp: data.timestamp,
-          provider: data.data.response.provider_used,
-          model: data.data.response.model_used,
-          tokensUsed: data.data.response.tokens_used.input + data.data.response.tokens_used.output,
-          latencyMs: data.data.response.latency_ms,
-          isTimeSensitive: data.data.response.isTimeSensitive,
-          webSearchUsed: data.data.response.web_search_enabled,
-          cached: data.data.response.cached,
-          language: data.data.response.language
-        };
-
-        setMessages(prev => [...prev.slice(0, -1), aiMessage]);
-        
-        // Update conversation title if this was first message
-        if (currentConversation && isFirstMessage) {
-          const title = messageText.length > 50 
-            ? messageText.substring(0, 47) + "..." 
-            : messageText;
-          
-          setCurrentConversation(prev => prev ? { ...prev, title } : null);
-          setConversations(prev => prev.map(c => 
-            c.id === currentConversation?.id ? { ...c, title } : c
-          ));
-        }
-
-        // Update conversation's updated timestamp
-        if (currentConversation) {
-          setConversations(prev => prev.map(c => 
-            c.id === currentConversation.id 
-              ? { ...c, updatedAt: new Date().toISOString() }
-              : c
-          ));
-        }
-
+      if (user) {
+        setUserId(user.id);
+        // Default to general chat for new users
+        setActiveChat('general');
       } else {
-        throw new Error(data.error || 'Unknown error');
+        router.push('/auth');
       }
+    }, 1000);
+  }, [user, router]);
 
-    } catch (error) {
-      console.error('Error sending message:', error);
-      
-      // Remove loading message
-      setMessages(prev => prev.filter(m => m.id !== 'loading'));
-      
-      // Add error message
-      const errorMessage: GeneralChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: error instanceof Error 
-          ? handleErrorMessage(error.message)
-          : 'Sorry, I encountered an error. Please try again.',
-        timestamp: new Date().toISOString(),
-        isError: true
-      };
-      
-      setMessages(prev => [...prev, errorMessage]);
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
-      // Handle rate limiting
-      if (error instanceof Error && error.message.includes('rate limit')) {
-        setRetryCountdown(60);
-      }
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4">Please sign in to continue</p>
+          <Button onClick={() => router.push('/auth')}>
+            Sign In
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
-      toast({
-        title: 'Error',
-        description: 'Failed to send message. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  const handleErrorMessage = (errorMessage: string): string => {
-    if (errorMessage.includes('rate limit')) {
-      return 'High traffic! Please wait a moment before sending another message.';
-    }
-    
-    if (errorMessage.includes('service unavailable')) {
-      return 'Sorry, AI service is temporarily unavailable. Please try again later.';
-    }
-    
-    if (errorMessage.includes('validation failed')) {
-      return 'Apologies, response generation error. Trying again...';
-    }
-    
-    return 'Sorry, I encountered an error. Please try again.';
-  };
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const formatTime = (timestamp: string) => {
-    return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
-
-  const clearChat = () => {
-    setMessages([]);
-    
-    toast({
-      title: 'Chat cleared',
-      description: 'Your chat history has been cleared.',
-    });
-  };
-
-  const exportChat = () => {
-    const chatData = {
-      conversation: currentConversation,
-      messages,
-      exportedAt: new Date().toISOString(),
-    };
-    
-    const blob = new Blob([JSON.stringify(chatData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `chat-export-${currentConversation?.id || 'new'}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    toast({
-      title: 'Chat exported',
-      description: 'Your chat history has been exported.',
-    });
-  };
-
-  return (
-    <div className="flex h-full bg-background">
-      {/* Sidebar - Conversations */}
-      <div className="w-80 border-r bg-muted/30 flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <BrainCircuit className="h-5 w-5 text-primary" />
-              <h2 className="font-semibold">AI Chat</h2>
-            </div>
-            <Button 
-              size="sm" 
-              onClick={createNewConversation}
-              disabled={isSending}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Ask general study questions
+  if (!activeChat) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-6">
+          <Button
+            variant="ghost"
+            onClick={() => router.push('/')}
+            className="mb-4"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <h1 className="text-3xl font-bold">AI Study Assistant</h1>
+          <p className="text-muted-foreground mt-2">
+            Choose your chat experience below
           </p>
         </div>
 
-        {/* Conversations List */}
-        <ScrollArea className="flex-1">
-          <div className="p-2 space-y-2">
-            {conversations.map((conversation) => (
-              <Card
-                key={conversation.id}
-                className={`p-3 cursor-pointer transition-colors hover:bg-accent group ${
-                  currentConversation?.id === conversation.id ? 'bg-accent' : ''
-                }`}
-                onClick={() => selectConversation(conversation)}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate text-sm">
-                      {conversation.title}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatTime(conversation.updatedAt)}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteConversation(conversation.id);
-                    }}
-                    className="ml-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              </Card>
-            ))}
-            
-            {conversations.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No conversations yet</p>
-                <p className="text-xs">Start a new chat to begin</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          {/* General Chat Card */}
+          <Card className="p-6 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setActiveChat('general')}>
+            <div className="flex items-start justify-between mb-4">
+              <MessageCircle className="h-8 w-8 text-blue-500" />
+              <Badge variant="secondary">Free</Badge>
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Ask Anything</h3>
+            <p className="text-muted-foreground mb-4">
+              General study questions and explanations. Get help with concepts, 
+              problems, and study tips without personal context.
+            </p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span>Instant responses</span>
               </div>
-            )}
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span>6 AI providers</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span>Web search enabled</span>
+              </div>
+            </div>
+            <Button className="w-full mt-4" onClick={() => setActiveChat('general')}>
+              Start General Chat
+            </Button>
+          </Card>
+
+          {/* Study Buddy Card */}
+          <Card className="p-6 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setActiveChat('study')}>
+            <div className="flex items-start justify-between mb-4">
+              <Brain className="h-8 w-8 text-purple-500" />
+              <Badge variant="secondary">Premium</Badge>
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Study Buddy</h3>
+            <p className="text-muted-foreground mb-4">
+              Personalized study assistant with your academic data. Get insights 
+              about your progress, weak areas, and tailored study advice.
+            </p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <span>Personal context</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <span>Memory system</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <span>Study analytics</span>
+              </div>
+            </div>
+            <Button className="w-full mt-4" onClick={() => setActiveChat('study')}>
+              Start Study Buddy
+            </Button>
+          </Card>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mt-8 text-center">
+          <div className="flex items-center justify-center gap-4">
+            <Button variant="outline" onClick={() => router.push('/admin')}>
+              <Settings className="h-4 w-4 mr-2" />
+              Admin Panel
+            </Button>
+            <Button variant="outline" onClick={() => router.push('/dashboard')}>
+              <Activity className="h-4 w-4 mr-2" />
+              System Dashboard
+            </Button>
           </div>
-        </ScrollArea>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen flex flex-col">
+      {/* Mobile Header */}
+      <div className="md:hidden border-b p-4 flex items-center justify-between">
+        <Button
+          variant="ghost"
+          onClick={() => setActiveChat(null)}
+          className="mr-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="flex items-center gap-2">
+          {activeChat === 'general' ? (
+            <MessageCircle className="h-5 w-5" />
+          ) : (
+            <Brain className="h-5 w-5" />
+          )}
+          <span className="font-semibold">
+            {activeChat === 'general' ? 'Ask Anything' : 'Study Buddy'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-xs">
+            AI Ready
+          </Badge>
+        </div>
       </div>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="flex h-16 items-center px-6 gap-4">
-            <div className="flex items-center gap-2">
-              <BrainCircuit className="h-6 w-6 text-primary" />
-              <div>
-                <h1 className="text-xl font-semibold">
-                  {currentConversation?.title || 'AI Chat'}
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  {isFirstMessage ? 'Ask general study questions' : 'Get instant AI responses'}
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex-1" />
-            
-            <div className="flex items-center gap-2">
-              {/* Action Buttons */}
-              <Button variant="ghost" size="sm" onClick={exportChat}>
-                Export
-              </Button>
-              <Button variant="ghost" size="sm" onClick={clearChat}>
-                Clear
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Messages Area */}
-        <div className="flex-1 overflow-hidden">
-          <ScrollArea className="h-full">
-            <div className="p-6 space-y-6">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                    <p className="mt-2 text-sm text-muted-foreground">Loading conversation...</p>
-                  </div>
-                </div>
-              ) : messages.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="max-w-md mx-auto">
-                    <BrainCircuit className="h-12 w-12 mx-auto mb-4 text-primary opacity-50" />
-                    <h3 className="text-lg font-semibold mb-2">Welcome to AI Chat!</h3>
-                    <p className="text-muted-foreground">
-                      Ask me anything about your studies, JEE preparation, or general questions. 
-                      I'm here to help with explanations, study tips, and more.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div className={`max-w-3xl ${message.role === 'user' ? 'order-2' : 'order-1'}`}>
-                      {/* Message Content */}
-                      <div
-                        className={`rounded-lg px-4 py-3 ${
-                          message.role === 'user'
-                            ? 'bg-primary text-primary-foreground ml-12'
-                            : message.isError
-                            ? 'bg-destructive/10 text-destructive border border-destructive/20 mr-12'
-                            : 'bg-muted mr-12'
-                        }`}
-                      >
-                        {message.isLoading ? (
-                          <div className="flex items-center gap-2">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                            <span className="text-sm">Getting response...</span>
-                          </div>
-                        ) : (
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                            {message.content}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Message Metadata */}
-                      {!message.isLoading && message.role === 'assistant' && (
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                          {/* Provider and Model */}
-                          <div className="flex items-center gap-1">
-                            <span>Powered by</span>
-                            <span className="font-medium">
-                              {message.model === 'llama-3.3-70b-versatile' 
-                                ? 'Groq Llama 3.3 70B' 
-                                : message.model || 'AI Model'}
-                            </span>
-                          </div>
-
-                          {/* Response Time */}
-                          {message.latencyMs && (
-                            <div className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              <span>{message.latencyMs}ms</span>
-                            </div>
-                          )}
-
-                          {/* Tokens */}
-                          {message.tokensUsed && (
-                            <div>
-                              <span>{message.tokensUsed} tokens</span>
-                            </div>
-                          )}
-
-                          {/* Web Search Indicator */}
-                          {message.webSearchUsed && (
-                            <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
-                              <Search className="h-3 w-3" />
-                              <span>Live information</span>
-                            </div>
-                          )}
-
-                          {/* Cache Indicator */}
-                          {message.cached && (
-                            <div className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded-full">
-                              <Zap className="h-3 w-3" />
-                              <span>From cache</span>
-                            </div>
-                          )}
-
-                          {/* Language Badge */}
-                          {message.language === 'hinglish' && (
-                            <div className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full">
-                              🇮🇳 Hinglish
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Timestamp */}
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {formatTime(message.timestamp)}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-              
-              <div ref={messagesEndRef} />
-            </div>
-          </ScrollArea>
-        </div>
-
-        {/* Input Area */}
-        <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="p-4">
-            <div className="flex gap-2">
-              <div className="flex-1 relative">
-                <Input
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Type your question here..."
-                  disabled={isSending || retryCountdown > 0}
-                  className="pr-16"
-                  maxLength={500}
-                />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                  {inputMessage.length}/500
-                </div>
-              </div>
-              <Button
-                onClick={sendMessage}
-                disabled={!inputMessage.trim() || isSending || retryCountdown > 0}
-                className="px-6"
-              >
-                {isSending ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                ) : retryCountdown > 0 ? (
-                  `${retryCountdown}s`
-                ) : (
-                  'Send'
-                )}
-              </Button>
-            </div>
-            
-            {retryCountdown > 0 && (
-              <p className="text-xs text-muted-foreground mt-2">
-                Try again in {retryCountdown} seconds
-              </p>
-            )}
-          </div>
-        </div>
+      {/* Chat Component */}
+      <div className="flex-1">
+        {activeChat === 'general' ? (
+          <GeneralChat userId={userId} />
+        ) : (
+          <StudyBuddy userId={userId} />
+        )}
       </div>
     </div>
-  );
-}
-
-export default function ChatPage() {
-  return (
-    <Suspense fallback={
-      <div className="flex h-full bg-background">
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-muted-foreground">Loading chat...</p>
-          </div>
-        </div>
-      </div>
-    }>
-      <ChatPageContent />
-    </Suspense>
   );
 }

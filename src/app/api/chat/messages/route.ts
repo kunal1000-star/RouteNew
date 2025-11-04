@@ -1,18 +1,11 @@
+// Get messages for a conversation
+// GET /api/chat/messages?conversationId=xxx
+// DELETE /api/chat/conversations/:id
+
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { z } from 'zod';
+import { supabase } from '@/lib/supabase';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
-// Schema for request validation
-const GetMessagesSchema = z.object({
-  conversationId: z.string().uuid()
-});
-
-// GET /api/chat/messages - Get all messages for a conversation
+// GET /api/chat/messages - Get messages for a conversation
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -20,84 +13,69 @@ export async function GET(request: NextRequest) {
 
     if (!conversationId) {
       return NextResponse.json(
-        { error: 'conversationId is required' },
+        { error: 'Missing conversationId parameter' },
         { status: 400 }
       );
     }
 
-    // Get conversation metadata
-    const { data: conversation } = await supabase
-      .from('chat_conversations')
-      .select('id, title, chat_type, created_at, updated_at')
-      .eq('id', conversationId)
-      .single();
-
-    if (!conversation) {
-      return NextResponse.json(
-        { error: 'Conversation not found' },
-        { status: 404 }
-      );
-    }
-
-    // Get all messages for this conversation
     const { data: messages, error } = await supabase
       .from('chat_messages')
-      .select(`
-        id,
-        role,
-        content,
-        model_used,
-        provider_used,
-        tokens_used,
-        latency_ms,
-        context_included,
-        timestamp
-      `)
+      .select('*')
       .eq('conversation_id', conversationId)
       .order('timestamp', { ascending: true });
 
     if (error) {
-      console.error('Error fetching messages:', error);
+      throw new Error(`Failed to fetch messages: ${error.message}`);
+    }
+
+    return NextResponse.json({ messages });
+  } catch (error) {
+    console.error('Get messages error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/chat/conversations/:id - Delete a conversation
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const conversationId = searchParams.get('id');
+
+    if (!conversationId) {
       return NextResponse.json(
-        { error: 'Failed to fetch messages' },
-        { status: 500 }
+        { error: 'Missing conversation ID' },
+        { status: 400 }
       );
     }
 
-    // Transform messages for frontend consumption
-    const transformedMessages = (messages || []).map(msg => ({
-      id: msg.id,
-      role: msg.role,
-      content: msg.content,
-      timestamp: msg.timestamp,
-      provider: msg.provider_used,
-      model: msg.model_used,
-      tokensUsed: msg.tokens_used,
-      latencyMs: msg.latency_ms,
-      contextIncluded: msg.context_included,
-      isTimeSensitive: false, // Will be determined on message creation
-      language: msg.role === 'assistant' ? 'hinglish' : undefined // All AI responses are Hinglish
-    }));
+    // Delete messages first (cascade)
+    const { error: messagesError } = await supabase
+      .from('chat_messages')
+      .delete()
+      .eq('conversation_id', conversationId);
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        conversation: {
-          id: conversation.id,
-          title: conversation.title,
-          chatType: conversation.chat_type,
-          createdAt: conversation.created_at,
-          updatedAt: conversation.updated_at,
-          messageCount: transformedMessages.length
-        },
-        messages: transformedMessages
-      }
-    });
+    if (messagesError) {
+      throw new Error(`Failed to delete messages: ${messagesError.message}`);
+    }
 
+    // Delete conversation
+    const { error: conversationError } = await supabase
+      .from('chat_conversations')
+      .delete()
+      .eq('id', conversationId);
+
+    if (conversationError) {
+      throw new Error(`Failed to delete conversation: ${conversationError.message}`);
+    }
+
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error in GET /api/chat/messages:', error);
+    console.error('Delete conversation error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     );
   }

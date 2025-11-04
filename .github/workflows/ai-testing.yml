@@ -1,0 +1,405 @@
+name: AI Testing Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  NODE_VERSION: '18'
+  PNPM_VERSION: '8'
+
+jobs:
+  lint-and-typecheck:
+    name: Lint and Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run ESLint
+        run: pnpm run lint
+
+      - name: Run Type Check
+        run: pnpm run typecheck
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test-suite: [ai-service-manager, providers, study-buddy]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run unit tests
+        run: |
+          case ${{ matrix.test-suite }} in
+            "ai-service-manager")
+              pnpm test:run src/lib/ai/tests/ai-service-manager.test.ts
+              ;;
+            "providers")
+              pnpm test:run src/lib/ai/providers/*.test.ts
+              ;;
+            "study-buddy")
+              pnpm test:run src/lib/ai/tests/study-buddy-integration.test.ts
+              ;;
+          esac
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.test-suite }}
+          path: |
+            coverage/
+            test-results.xml
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: blockwise_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup test database
+        run: |
+          # Wait for PostgreSQL to be ready
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+          
+          # Run database migrations
+          DATABASE_URL="postgresql://postgres:postgres@localhost:5432/blockwise_test" pnpm run migrate
+
+      - name: Run integration tests
+        run: pnpm test:run src/lib/ai/tests/integration/
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/blockwise_test
+          TESTING: true
+
+      - name: Upload integration test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-results
+          path: |
+            coverage/
+            test-results.xml
+
+  api-tests:
+    name: AI Provider API Tests
+    runs-on: ubuntu-latest
+    if: ${{ secrets.GROQ_API_KEY || secrets.GEMINI_API_KEY }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run AI provider tests
+        run: pnpm run test:ai
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
+      - name: Upload API test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-test-results
+          path: logs/
+
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run performance tests
+        run: pnpm run test:performance
+        env:
+          TESTING: true
+
+      - name: Upload performance test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-test-results
+          path: |
+            performance-results.json
+            coverage/
+
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    needs: [lint-and-typecheck, unit-tests, integration-tests]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build application
+        run: pnpm run build
+
+      - name: Start application
+        run: pnpm run start &
+        env:
+          NODE_ENV: test
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Wait for application to start
+        run: npx wait-on http://localhost:3000
+
+      - name: Run E2E tests
+        run: pnpm run test:e2e
+
+      - name: Upload E2E test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-test-results
+          path: |
+            playwright-report/
+            test-results/
+
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [lint-and-typecheck, unit-tests, integration-tests, api-tests, performance-tests, e2e-tests]
+    if: always()
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Generate test summary
+        run: |
+          echo "## Test Results Summary" > test-summary.md
+          echo "" >> test-summary.md
+          
+          # Count test results
+          total_passed=0
+          total_failed=0
+          total_coverage=0
+          
+          for dir in */; do
+            if [[ -f "$dir/coverage/index.html" ]]; then
+              echo "### ${dir%/} Coverage Report" >> test-summary.md
+              echo "- [View Coverage Report]($dir/coverage/index.html)" >> test-summary.md
+              echo "" >> test-summary.md
+            fi
+          done
+          
+          echo "### Artifacts" >> test-summary.md
+          for artifact in */; do
+            if [[ -d "$artifact" ]]; then
+              echo "- $artifact" >> test-summary.md
+            fi
+          done
+
+      - name: Comment PR with test results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('test-summary.md')) {
+              const summary = fs.readFileSync('test-summary.md', 'utf8');
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: summary
+              });
+            }
+
+      - name: Upload test summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-summary
+          path: test-summary.md
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm audit --audit-level=moderate
+
+      - name: Run Snyk security scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+
+  benchmark-comparison:
+    name: Performance Benchmark Comparison
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run performance benchmarks
+        run: pnpm run test:benchmarks
+
+      - name: Compare with baseline
+        run: |
+          # Compare current performance with baseline
+          if [[ -f "baseline-performance.json" ]]; then
+            node scripts/compare-performance.js
+          fi
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: |
+            performance-results.json
+            benchmark-comparison.json

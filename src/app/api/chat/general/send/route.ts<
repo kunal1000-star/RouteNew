@@ -1,4 +1,4 @@
-// Study Assistant API - Phase 4: Study Buddy Integration
+// Chat API Endpoints - Phase 3: General Chat Integration
 // ====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -7,13 +7,7 @@ import { supabase } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
-    const { 
-      userId, 
-      conversationId, 
-      message, 
-      chatType,
-      isPersonalQuery = false
-    } = await request.json();
+    const { userId, conversationId, message, chatType } = await request.json();
 
     if (!userId || !message || !chatType) {
       return NextResponse.json(
@@ -49,49 +43,20 @@ export async function POST(request: NextRequest) {
         conversation_id: finalConversationId,
         role: 'user',
         content: message,
-        context_included: isPersonalQuery
+        context_included: false
       });
 
     if (userMessageError) {
       throw new Error(`Failed to store user message: ${userMessageError.message}`);
     }
 
-    // Fetch student context if this is a personal query
-    let studentContext = null;
-    if (isPersonalQuery) {
-      try {
-        // This would integrate with the actual student context builder
-        studentContext = {
-          userId,
-          profileText: "JEE 2025 aspirant. Physics: 78%, Chemistry: 82%, Maths: 75%.",
-          strongSubjects: ['Organic Chemistry', 'Kinematics'],
-          weakSubjects: ['Thermodynamics', 'Modern Physics'],
-          examTarget: 'JEE 2025',
-          studyProgress: {
-            totalTopics: 50,
-            completedTopics: 35,
-            accuracy: 78
-          },
-          currentData: {
-            streak: 7,
-            level: 3,
-            points: 1250,
-            revisionQueue: 5
-          },
-          learningStyle: 'visual'
-        };
-      } catch (contextError) {
-        console.warn('Failed to fetch student context:', contextError);
-      }
-    }
-
-    // Call AI Service Manager with study assistant context
+    // Call AI Service Manager
     const aiResponse = await aiServiceManager.processQuery({
       userId,
       conversationId: finalConversationId,
       message,
-      chatType: 'study_assistant',
-      includeAppData: isPersonalQuery
+      chatType,
+      includeAppData: false
     });
 
     // Store AI response
@@ -105,7 +70,7 @@ export async function POST(request: NextRequest) {
         provider_used: aiResponse.provider,
         tokens_used: aiResponse.tokens_used.input + aiResponse.tokens_used.output,
         latency_ms: aiResponse.latency_ms,
-        context_included: isPersonalQuery
+        context_included: aiResponse.web_search_enabled
       });
 
     if (aiMessageError) {
@@ -118,40 +83,13 @@ export async function POST(request: NextRequest) {
       .update({ updated_at: new Date().toISOString() })
       .eq('id', finalConversationId);
 
-    // Extract and store memories for personal queries
-    let memoryReferences = [];
-    if (isPersonalQuery && aiResponse.content) {
-      try {
-        // This would integrate with the actual memory extraction system
-        memoryReferences = [
-          {
-            id: 'memory-1',
-            content: 'Student struggled with entropy concept in previous session',
-            similarity: 0.85,
-            created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-            importance_score: 4,
-            tags: ['weakness', 'thermodynamics']
-          }
-        ];
-        
-        // Store the memory (in real implementation, this would be done by memory-extractor.ts)
-        if (memoryReferences.length > 0) {
-          // Would store in study_chat_memory table
-        }
-      } catch (memoryError) {
-        console.warn('Failed to extract/store memories:', memoryError);
-      }
-    }
-
     return NextResponse.json({
       response: aiResponse,
-      conversationId: finalConversationId,
-      memoryReferences: isPersonalQuery ? memoryReferences : [],
-      studentContext: isPersonalQuery ? studentContext : null
+      conversationId: finalConversationId
     });
 
   } catch (error) {
-    console.error('Study assistant send error:', error);
+    console.error('Chat send error:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }

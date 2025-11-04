@@ -658,6 +658,255 @@ export interface Database {
           updated_at?: string
         }
       }
+      // AI-related tables from implementation plan
+      chat_conversations: {
+        Row: {
+          id: string
+          user_id: string
+          title: string
+          chat_type: 'general' | 'study_assistant'
+          created_at: string
+          updated_at: string
+          is_archived: boolean
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          title: string
+          chat_type: 'general' | 'study_assistant'
+          created_at?: string
+          updated_at?: string
+          is_archived?: boolean
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          title?: string
+          chat_type?: 'general' | 'study_assistant'
+          created_at?: string
+          updated_at?: string
+          is_archived?: boolean
+        }
+      }
+      chat_messages: {
+        Row: {
+          id: string
+          conversation_id: string
+          role: 'user' | 'assistant'
+          content: string
+          model_used?: string
+          provider_used?: string
+          tokens_used: number
+          latency_ms?: number
+          context_included: boolean
+          timestamp: string
+        }
+        Insert: {
+          id?: string
+          conversation_id: string
+          role: 'user' | 'assistant'
+          content: string
+          model_used?: string
+          provider_used?: string
+          tokens_used?: number
+          latency_ms?: number
+          context_included?: boolean
+          timestamp?: string
+        }
+        Update: {
+          id?: string
+          conversation_id?: string
+          role?: 'user' | 'assistant'
+          content?: string
+          model_used?: string
+          provider_used?: string
+          tokens_used?: number
+          latency_ms?: number
+          context_included?: boolean
+          timestamp?: string
+        }
+      }
+      study_chat_memory: {
+        Row: {
+          id: string
+          user_id: string
+          content: string
+          embedding?: number[]
+          importance_score: 1 | 2 | 3 | 4 | 5
+          tags?: string[]
+          source_conversation_id?: string
+          created_at: string
+          expires_at: string
+          is_active: boolean
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          content: string
+          embedding?: number[]
+          importance_score?: 1 | 2 | 3 | 4 | 5
+          tags?: string[]
+          source_conversation_id?: string
+          created_at?: string
+          expires_at?: string
+          is_active?: boolean
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          content?: string
+          embedding?: number[]
+          importance_score?: 1 | 2 | 3 | 4 | 5
+          tags?: string[]
+          source_conversation_id?: string
+          created_at?: string
+          expires_at?: string
+          is_active?: boolean
+        }
+      }
+      memory_summaries: {
+        Row: {
+          id: string
+          user_id: string
+          summary_type: 'weekly' | 'monthly'
+          period_start: string
+          period_end: string
+          summary_text: string
+          token_count: number
+          created_at: string
+          expires_at?: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          summary_type: 'weekly' | 'monthly'
+          period_start: string
+          period_end: string
+          summary_text: string
+          token_count: number
+          created_at?: string
+          expires_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          summary_type?: 'weekly' | 'monthly'
+          period_start?: string
+          period_end?: string
+          summary_text?: string
+          token_count?: number
+          created_at?: string
+          expires_at?: string
+        }
+      }
+      student_ai_profile: {
+        Row: {
+          user_id: string
+          profile_text: string
+          strong_subjects?: string[]
+          weak_subjects?: string[]
+          learning_style?: string
+          exam_target?: string
+          last_updated: string
+        }
+        Insert: {
+          user_id: string
+          profile_text: string
+          strong_subjects?: string[]
+          weak_subjects?: string[]
+          learning_style?: string
+          exam_target?: string
+          last_updated?: string
+        }
+        Update: {
+          user_id?: string
+          profile_text?: string
+          strong_subjects?: string[]
+          weak_subjects?: string[]
+          learning_style?: string
+          exam_target?: string
+          last_updated?: string
+        }
+      }
+      api_usage_logs: {
+        Row: {
+          id: string
+          user_id?: string
+          feature_name: string
+          provider_used: string
+          model_used: string
+          tokens_input: number
+          tokens_output: number
+          latency_ms?: number
+          cached: boolean
+          cost_estimate: number
+          timestamp: string
+          success: boolean
+          error_message?: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string
+          feature_name: string
+          provider_used: string
+          model_used: string
+          tokens_input?: number
+          tokens_output?: number
+          latency_ms?: number
+          cached?: boolean
+          cost_estimate?: number
+          timestamp?: string
+          success?: boolean
+          error_message?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          feature_name?: string
+          provider_used?: string
+          model_used?: string
+          tokens_input?: number
+          tokens_output?: number
+          latency_ms?: number
+          cached?: boolean
+          cost_estimate?: number
+          timestamp?: string
+          success?: boolean
+          error_message?: string
+        }
+      }
+      ai_system_prompts: {
+        Row: {
+          id: string
+          name: string
+          system_prompt: string
+          language: string
+          is_active: boolean
+          version: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          system_prompt: string
+          language: string
+          is_active?: boolean
+          version?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          system_prompt?: string
+          language?: string
+          is_active?: boolean
+          version?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [key: string]: {

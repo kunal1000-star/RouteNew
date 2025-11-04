@@ -1,13 +1,14 @@
 'use client';
 
-import { Suspense } from 'react';
-import { Settings, Plus, BookOpen } from 'lucide-react';
+import React, { useState, Suspense } from 'react';
+import { Settings, Plus, BookOpen, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import ProviderSelector from '@/components/chat/ProviderSelector';
 import StudyContextPanel from '@/components/chat/StudyContextPanel';
 import StudentProfileCard from '@/components/study-buddy/StudentProfileCard';
 import StudyBuddyChat from '@/components/study-buddy/study-buddy-chat';
+import { FileUploadModal } from '@/components/study-buddy/FileUploadModal';
 import { useStudyBuddy } from '@/hooks/use-study-buddy';
 
 function StudyBuddyPage() {
@@ -30,9 +31,10 @@ function StudyBuddyPage() {
     toggleSettings,
     toggleContext,
     exportChat,
-    messagesEndRef,
-    fileInputRef,
   } = useStudyBuddy();
+
+  // State for file upload modal
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   return (
     <div className="flex h-full bg-gradient-to-br from-blue-50/50 to-purple-50/30">
@@ -67,10 +69,21 @@ function StudyBuddyPage() {
               onClick={startNewChat}
               variant="outline" 
               size="sm"
-              className="hidden md:flex items-center gap-2"
+              className="hidden lg:flex items-center gap-2"
             >
               <Plus className="h-4 w-4" />
               New Chat
+            </Button>
+
+            {/* Upload Material Button */}
+            <Button 
+              onClick={() => setIsUploadModalOpen(true)}
+              variant="default" 
+              size="sm"
+              className="hidden lg:flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            >
+              <Upload className="h-4 w-4" />
+              Upload Material
             </Button>
             
             <div className="flex items-center gap-2">
@@ -170,6 +183,28 @@ function StudyBuddyPage() {
               <StudentProfileCard userId={userId} />
             </div>
           )}
+
+          {/* Mobile Upload Button */}
+          <div className="lg:hidden px-4 pb-3 flex gap-2">
+            <Button 
+              onClick={startNewChat}
+              variant="outline" 
+              size="sm"
+              className="flex-1 items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              New Chat
+            </Button>
+            <Button 
+              onClick={() => setIsUploadModalOpen(true)}
+              variant="default" 
+              size="sm"
+              className="flex-1 items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600"
+            >
+              <Upload className="h-4 w-4" />
+              Upload
+            </Button>
+          </div>
         </div>
 
         {/* Chat Interface */}
@@ -183,6 +218,17 @@ function StudyBuddyPage() {
             studyContext={studyContext}
           />
         </div>
+
+        {/* File Upload Modal */}
+        <FileUploadModal
+          isOpen={isUploadModalOpen}
+          onClose={() => setIsUploadModalOpen(false)}
+          onAnalysisComplete={(analysis) => {
+            console.log('File analysis completed:', analysis);
+            // You could integrate this with the chat to discuss the file
+            handleSendMessage(`I've uploaded and analyzed "${analysis.fileName}". ${analysis.analysis.summary}`);
+          }}
+        />
       </div>
     </div>
   );
