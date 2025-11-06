@@ -1,4 +1,3 @@
-
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
@@ -30,6 +29,12 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+  },
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['localhost:3000', '10.88.0.3:3000'],
+      bodySizeLimit: '2mb',
+    },
   },
 };
 

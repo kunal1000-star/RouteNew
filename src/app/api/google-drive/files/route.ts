@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
+    const action = searchParams.get('action');
 
     if (!userId) {
       return NextResponse.json(
@@ -17,7 +18,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check authentication status first
+    // Handle status action for connection checking
+    if (action === 'status') {
+      const isAuthenticated = await googleDriveService.getAuthStatus(userId);
+      return NextResponse.json({
+        success: true,
+        data: { 
+          isAuthenticated,
+          connectedAt: isAuthenticated ? new Date().toISOString() : null
+        }
+      });
+    }
+
+    // Check authentication status first for other actions
     const isAuthenticated = await googleDriveService.getAuthStatus(userId);
     if (!isAuthenticated) {
       return NextResponse.json(
