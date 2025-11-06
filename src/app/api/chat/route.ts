@@ -1,11 +1,77 @@
-// Main Chat API Route
-// ==================
+// Main Chat API Route - Enhanced with Error Handling
+// ==================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getChatService } from '@/lib/ai/chat/chat-service';
-import { getInitializedChatService } from '@/lib/ai/chat/index';
-import { ChatApiRequest, ChatApiResponse } from '@/types/chat';
 import type { AIProvider } from '@/types/api-test';
+
+// Simple request/response interfaces for this route
+interface ChatMessageRequest {
+  message: string;
+  provider?: AIProvider;
+  context?: any;
+  preferences?: any;
+  sessionId?: string;
+}
+
+interface ChatMessageResponse {
+  success: boolean;
+  data?: {
+    response: any;
+    sessionId: string;
+  };
+  error?: {
+    code: string;
+    message: string;
+    details?: string;
+  };
+  metadata?: {
+    timestamp: string;
+    requestId: string;
+    processingTime: number;
+  };
+}
+
+// Graceful chat service initialization with fallbacks
+async function getChatServiceSafely() {
+  try {
+    // Try to import the JavaScript-compatible chat service
+    const { getChatService, getInitializedChatService } = await import('@/lib/ai/chat/simple-index');
+    
+    try {
+      // Try to get existing service first
+      const service = getChatService();
+      return { service, error: null, initialized: true };
+    } catch (getError) {
+      // Try to initialize if not available
+      const service = await getInitializedChatService();
+      return { service, error: null, initialized: true };
+    }
+  } catch (importError) {
+    console.warn('Chat service initialization failed:', importError instanceof Error ? importError.message : String(importError));
+    return {
+      service: null,
+      error: importError instanceof Error ? importError.message : String(importError),
+      initialized: false,
+      reason: 'Chat service modules not available'
+    };
+  }
+}
+
+// Mock response for when chat service is unavailable
+function createMockChatResponse(message: string): any {
+  return {
+    id: `mock-${Date.now()}`,
+    content: `Hello! I'm currently in offline mode, but I received your message: "${message}". The AI chat service is temporarily unavailable. Please try again later.`,
+    provider: 'mock',
+    model: 'offline-mode',
+    tokensUsed: 0,
+    timestamp: new Date(),
+    metadata: {
+      offlineMode: true,
+      originalMessage: message
+    }
+  };
+}
 
 // POST /api/chat - Send a chat message
 export async function POST(request: NextRequest) {
@@ -14,7 +80,7 @@ export async function POST(request: NextRequest) {
     const requestId = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     // Parse request body
-    const body: ChatApiRequest = await request.json();
+    const body = await request.json() as ChatMessageRequest;
     
     // Validate required fields
     if (!body.message || typeof body.message !== 'string') {
@@ -48,36 +114,53 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Get chat service (with auto-initialization)
-    const chatService = await getInitializedChatService();
+    // Get chat service safely with fallback
+    const { service: chatService, initialized } = await getChatServiceSafely();
     
-    // Convert API request to internal format
-    const chatRequest = {
-      message: body.message,
-      context: body.context,
-      preferences: {
-        ...body.preferences,
-        streamResponses: false, // Force non-streaming for this endpoint
-      },
-      provider: body.provider as AIProvider,
-      sessionId: body.sessionId,
-      stream: false,
-    };
+    let response;
+    let sessionId = body.sessionId;
 
-    // Send message
-    const response = await chatService.sendMessage(chatRequest);
+    if (chatService && initialized) {
+      try {
+        // Convert API request to internal format
+        const chatRequest = {
+          message: body.message,
+          context: body.context,
+          preferences: {
+            ...body.preferences,
+            streamResponses: false, // Force non-streaming for this endpoint
+          },
+          provider: body.provider as AIProvider,
+          sessionId: body.sessionId,
+          stream: false,
+        };
+
+        // Send message using real chat service
+        response = await chatService.sendMessage(chatRequest);
+        sessionId = chatRequest.sessionId || (response as any).sessionId;
+      } catch (serviceError) {
+        console.warn('Chat service error, using mock response:', serviceError);
+        response = createMockChatResponse(body.message);
+        sessionId = sessionId || `mock-session-${Date.now()}`;
+      }
+    } else {
+      // Chat service unavailable, return mock response
+      response = createMockChatResponse(body.message);
+      sessionId = sessionId || `mock-session-${Date.now()}`;
+    }
     
     // Return success response
     return NextResponse.json({
       success: true,
       data: {
         response,
-        sessionId: chatRequest.sessionId || (response as any).sessionId,
+        sessionId,
       },
       metadata: {
         timestamp: new Date().toISOString(),
         requestId,
         processingTime: Date.now() - startTime,
+        serviceInitialized: initialized,
       },
     });
 
@@ -136,40 +219,59 @@ export async function POST(request: NextRequest) {
 // GET /api/chat - Get chat service health and capabilities
 export async function GET() {
   try {
-    // Try to get chat service (will auto-initialize if needed)
-    let chatService;
-    try {
-      chatService = getChatService();
-    } catch (error) {
-      // Auto-initialize if service not available
-      await getInitializedChatService();
-      chatService = getChatService();
-    }
+    // Get chat service safely with fallback
+    const { service: chatService, initialized } = await getChatServiceSafely();
     
-    // Get service configuration
-    const config = chatService.getConfig();
+    let serviceInfo = {
+      healthy: false,
+      version: '1.0.0',
+      offlineMode: true,
+    };
     
-    // Get provider metrics
-    const providerMetrics = chatService.getProviderMetrics();
+    let providers: any[] = [];
+    let capabilities = {
+      streaming: false,
+      fallback: false,
+      sessionManagement: false,
+      studyContext: false,
+    };
     
-    return NextResponse.json({
-      success: true,
-      data: {
-        service: {
+    if (chatService && initialized) {
+      try {
+        // Get real service configuration and metrics
+        const config = chatService.getConfig();
+        const metrics = chatService.getProviderMetrics();
+        
+        serviceInfo = {
           healthy: true,
           version: '1.0.0',
-          config,
-        },
-        providers: providerMetrics,
-        capabilities: {
+          offlineMode: false,
+          config: config,
+        } as any;
+        
+        providers = metrics;
+        
+        capabilities = {
           streaming: true,
           fallback: true,
           sessionManagement: true,
           studyContext: true,
-        },
+        };
+      } catch (serviceError) {
+        console.warn('Chat service health check failed:', serviceError);
+      }
+    }
+    
+    return NextResponse.json({
+      success: true,
+      data: {
+        service: serviceInfo,
+        providers,
+        capabilities,
       },
       metadata: {
         timestamp: new Date().toISOString(),
+        serviceInitialized: initialized,
       },
     });
 

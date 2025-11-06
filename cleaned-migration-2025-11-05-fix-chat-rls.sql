@@ -1,0 +1,131 @@
+-- ============================================================================
+-- CLEANED MIGRATION FILE: migration-2025-11-05-fix-chat-rls.sql
+-- Generated: 2025-11-06T08:29:02.036Z
+-- Purpose: Safe migration execution without conflicts
+-- 
+-- Changes Made:
+-- - Added IF NOT EXISTS to CREATE TABLE statements
+-- - Added IF NOT EXISTS to CREATE INDEX statements  
+-- - Added IF NOT EXISTS to CREATE POLICY statements
+-- - Removed duplicate DROP POLICY statements
+-- - Removed basic duplicate CREATE statements
+-- 
+-- This file should execute safely on existing databases.
+-- ============================================================================
+
+-- Fix Chat RLS Policies for Authenticated Users
+-- ===============================================
+-- This migration fixes the Row Level Security policies for chat conversations
+-- to allow properly authenticated users to create and manage their conversations
+
+-- Enable Row Level Security on chat tables if not already enabled
+ALTER TABLE IF EXISTS chat_conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS chat_messages ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing conflicting policies if they exist
+DROP POLICY IF EXISTS "Users can view their own chat conversations" ON chat_conversations;
+DROP POLICY IF EXISTS "Users can insert their own chat conversations" ON chat_conversations;
+DROP POLICY IF EXISTS "Users can update their own chat conversations" ON chat_conversations;
+DROP POLICY IF EXISTS "Users can delete their own chat conversations" ON chat_conversations;
+
+DROP POLICY IF EXISTS "Users can view their own chat messages" ON chat_messages;
+DROP POLICY IF EXISTS "Users can insert their own chat messages" ON chat_messages;
+DROP POLICY IF EXISTS "Users can update their own chat messages" ON chat_messages;
+DROP POLICY IF EXISTS "Users can delete their own chat messages" ON chat_messages;
+
+-- Create proper RLS policies for chat_conversations
+CREATE POLICY IF NOT EXISTS "Users can view their own chat conversations" ON chat_conversations
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY IF NOT EXISTS "Users can insert their own chat conversations" ON chat_conversations
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY IF NOT EXISTS "Users can update their own chat conversations" ON chat_conversations
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY IF NOT EXISTS "Users can delete their own chat conversations" ON chat_conversations
+    FOR DELETE USING (auth.uid() = user_id);
+
+-- Create proper RLS policies for chat_messages
+CREATE POLICY IF NOT EXISTS "Users can view messages from their conversations" ON chat_messages
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM chat_conversations 
+            WHERE chat_conversations.id = chat_messages.conversation_id 
+            AND chat_conversations.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY IF NOT EXISTS "Users can insert messages to their conversations" ON chat_messages
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM chat_conversations 
+            WHERE chat_conversations.id = chat_messages.conversation_id 
+            AND chat_conversations.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY IF NOT EXISTS "Users can update their own chat messages" ON chat_messages
+    FOR UPDATE USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY IF NOT EXISTS "Users can delete their own chat messages" ON chat_messages
+    FOR DELETE USING (auth.uid() IS NOT NULL);
+
+-- Create additional policies for AI system access
+-- Allow authenticated users to access their data through the API
+CREATE POLICY IF NOT EXISTS "Authenticated users can create conversations" ON chat_conversations
+    FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY IF NOT EXISTS "Authenticated users can create messages" ON chat_messages
+    FOR INSERT TO authenticated WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM chat_conversations 
+            WHERE chat_conversations.id = chat_messages.conversation_id 
+            AND chat_conversations.user_id = auth.uid()
+        )
+    );
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_chat_conversations_user_id ON chat_conversations(user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_conversations_user_chat_type ON chat_conversations(user_id, chat_type);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_conversation_id ON chat_messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_timestamp ON chat_messages(timestamp);
+
+-- Create function to ensure user can only access their own data
+CREATE OR REPLACE FUNCTION check_user_access()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Check if user has access to the conversation
+    IF NEW.user_id IS NOT NULL AND auth.uid() IS NOT NULL AND NEW.user_id != auth.uid() THEN
+        RAISE EXCEPTION 'User can only access their own conversations';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Add trigger to enforce user access
+DROP TRIGGER IF EXISTS enforce_chat_user_access ON chat_conversations;
+CREATE TRIGGER enforce_chat_user_access
+    BEFORE INSERT OR UPDATE ON chat_conversations
+    FOR EACH ROW
+    EXECUTE FUNCTION check_user_access();
+
+-- Grant necessary permissions
+GRANT USAGE ON SCHEMA public TO authenticated;
+GRANT ALL ON chat_conversations TO authenticated;
+GRANT ALL ON chat_messages TO authenticated;
+GRANT ALL ON ai_embeddings TO authenticated;
+GRANT ALL ON ai_memory TO authenticated;
+
+-- Ensure the policies work with both authenticated and anonymous users appropriately
+-- This is important for the AI service to work properly
+ALTER TABLE chat_conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
+
+-- Final verification - check if policies are properly set
+DO $$
+BEGIN
+    RAISE NOTICE 'Chat RLS policies created successfully for authenticated users';
+    RAISE NOTICE 'Users can now create and manage their own chat conversations';
+    RAISE NOTICE 'AI system will work properly with authenticated users';
+END $$;

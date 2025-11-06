@@ -140,19 +140,40 @@ export class OpenRouterClient {
   }
 
   /**
-   * Get available models
+   * Get available models - FREE MODELS FIRST
    */
   getAvailableModels(): string[] {
     return [
+      // FREE MODELS (Priority)
+      'meta-llama/llama-3.1-8b-instruct:free',
+      'meta-llama/llama-3.1-70b-instruct:free', 
+      'mistralai/mistral-7b-instruct:free',
+      'qwen/qwen-2-7b-instruct:free',
+      'microsoft/phi-3-mini-128k-instruct:free',
+      'NousResearch/hermes-2-pro-llama-3-8b:free',
+      'google/gemini-flash-1.5:free',
+      // PAID MODELS (Fallback)
       'openai/gpt-3.5-turbo',
       'openai/gpt-4o',
       'openai/gpt-4-turbo',
       'anthropic/claude-3.5-sonnet',
       'anthropic/claude-3-haiku',
-      'google/gemini-pro-1.5',
-      'meta-llama/llama-3.1-70b-instruct',
-      'mistralai/mistral-7b-instruct',
-      'qwen/qwen-2-72b-instruct'
+      'google/gemini-pro-1.5'
+    ];
+  }
+
+  /**
+   * Get FREE models only
+   */
+  getFreeModels(): string[] {
+    return [
+      'meta-llama/llama-3.1-8b-instruct:free',
+      'meta-llama/llama-3.1-70b-instruct:free', 
+      'mistralai/mistral-7b-instruct:free',
+      'qwen/qwen-2-7b-instruct:free',
+      'microsoft/phi-3-mini-128k-instruct:free',
+      'NousResearch/hermes-2-pro-llama-3-8b:free',
+      'google/gemini-flash-1.5:free'
     ];
   }
 
@@ -176,13 +197,25 @@ export class OpenRouterClient {
     const isGPT = model.includes('gpt');
     const isClaude = model.includes('claude');
     const isGemini = model.includes('gemini');
+    const isFree = model.includes(':free');
+    const isLlama = model.includes('llama');
+    const isMistral = model.includes('mistral');
+    const isQwen = model.includes('qwen');
+    const isPhi = model.includes('phi');
     
     return {
       supportsStreaming: true,
-      supportsFunctionCalling: isGPT || isClaude,
-      supportsJsonMode: isGPT || isClaude,
-      maxTokens: isGPT ? 32768 : 8192
+      supportsFunctionCalling: isGPT || isClaude || isLlama || isMistral,
+      supportsJsonMode: isGPT || isClaude || isLlama || isMistral,
+      maxTokens: isFree ? 32000 : (isGPT ? 32768 : 8192)
     };
+  }
+
+  /**
+   * Check if a model is free
+   */
+  isModelFree(model: string): boolean {
+    return model.includes(':free');
   }
 
   private async makeRequest(request: OpenRouterRequest, timeout: number): Promise<OpenRouterResponse> {
@@ -248,15 +281,20 @@ export class OpenRouterClient {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  /**
+   * Get default model - NOW USING FREE MODEL
+   */
   private getDefaultModel(): string {
-    return 'openai/gpt-3.5-turbo';
+    return 'meta-llama/llama-3.1-8b-instruct:free'; // FREE MODEL!
   }
 
   getProviderInfo() {
+    const freeModels = this.getFreeModels();
     return {
       name: 'OpenRouter',
       tier: 5,
       models: this.getAvailableModels(),
+      freeModels: freeModels,
       capabilities: {
         supportsStreaming: true,
         supportsFunctionCalling: true,

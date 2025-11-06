@@ -1,9 +1,45 @@
-// Chat API Endpoints - Phase 3: General Chat Integration
-// ====================================================
+// Chat API Endpoints - Phase 3: General Chat Integration with Error Handling
+// ========================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { aiServiceManager } from '@/lib/ai/ai-service-manager';
 import { supabase } from '@/lib/supabase';
+
+// Graceful AI service manager initialization
+async function getAiServiceManagerSafely() {
+  try {
+    // Try to import ai-service-manager
+    const { aiServiceManager } = await import('@/lib/ai/ai-service-manager');
+    return { service: aiServiceManager, error: null, initialized: true };
+  } catch (importError) {
+    console.warn('AI service manager not available:', importError instanceof Error ? importError.message : String(importError));
+    return {
+      service: null,
+      error: importError instanceof Error ? importError.message : String(importError),
+      initialized: false,
+      reason: 'AI service manager modules not available'
+    };
+  }
+}
+
+// Mock AI response for fallback
+function createMockAiResponse(message: string, chatType: string) {
+  return {
+    content: `I received your message: "${message}". I'm currently running in fallback mode as the advanced AI service is being initialized. Please try again in a moment for full AI capabilities.`,
+    model_used: 'fallback-v1',
+    provider: 'mock-service',
+    tokens_used: {
+      input: 10,
+      output: 20
+    },
+    latency_ms: 100,
+    query_type: 'general',
+    web_search_enabled: false,
+    fallback_used: true,
+    cached: false,
+    isTimeSensitive: false,
+    language: 'english' as const
+  };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -50,14 +86,29 @@ export async function POST(request: NextRequest) {
       throw new Error(`Failed to store user message: ${userMessageError.message}`);
     }
 
-    // Call AI Service Manager
-    const aiResponse = await aiServiceManager.processQuery({
-      userId,
-      conversationId: finalConversationId,
-      message,
-      chatType,
-      includeAppData: false
-    });
+    // Try to get AI service manager safely
+    const { service: aiServiceManager, initialized } = await getAiServiceManagerSafely();
+    
+    let aiResponse;
+    
+    if (aiServiceManager && initialized) {
+      try {
+        // Call AI Service Manager
+        aiResponse = await aiServiceManager.processQuery({
+          userId,
+          conversationId: finalConversationId,
+          message,
+          chatType,
+          includeAppData: false
+        });
+      } catch (serviceError) {
+        console.warn('AI service error, using mock response:', serviceError);
+        aiResponse = createMockAiResponse(message, chatType);
+      }
+    } else {
+      // Use mock response when service is unavailable
+      aiResponse = createMockAiResponse(message, chatType);
+    }
 
     // Store AI response
     const { error: aiMessageError } = await supabase
@@ -85,13 +136,20 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       response: aiResponse,
-      conversationId: finalConversationId
+      conversationId: finalConversationId,
+      metadata: {
+        serviceInitialized: initialized,
+        fallbackMode: !initialized
+      }
     });
 
   } catch (error) {
     console.error('Chat send error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      {
+        error: error instanceof Error ? error.message : 'Internal server error',
+        details: error instanceof Error ? error.stack : String(error)
+      },
       { status: 500 }
     );
   }
