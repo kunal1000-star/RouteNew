@@ -15,6 +15,20 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+function getDbForToken(token: string) {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    }
+  );
+}
+
 async function authenticateUser(request: NextRequest) {
   console.log('🔐 Authenticating user request...');
   
@@ -23,7 +37,8 @@ async function authenticateUser(request: NextRequest) {
   if (authHeader?.startsWith('Bearer ')) {
     console.log('🔑 Supabase Bearer token found');
     const token = authHeader.substring(7);
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    const db = getDbForToken(token);
+    const { data: { user }, error } = await db.auth.getUser();
     
     if (error || !user) {
       console.log('❌ Supabase token validation failed:', error?.message);
@@ -31,7 +46,7 @@ async function authenticateUser(request: NextRequest) {
     }
     
     console.log('✅ Supabase authentication successful');
-    return { authorized: true, user };
+    return { authorized: true, user, token };
   }
   
   // Check for NextAuth headers
@@ -92,6 +107,9 @@ export async function GET(request: NextRequest) {
     const refresh = searchParams.get('refresh') === 'true';
     const type = searchParams.get('type'); // Filter by suggestion type
 
+    // Use a per-request client with the user's JWT for RLS
+    const db = (auth as any).token ? getDbForToken((auth as any).token) : supabase
+
     // Check cache first (unless refresh is requested)
     if (!refresh) {
       const cached = getCachedSuggestions(userId);
@@ -110,45 +128,87 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get active suggestions from database
-    let query = supabase
-      .from('ai_suggestions')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .gt('expires_at', new Date().toISOString());
+    // Get suggestions from database with compatibility for multiple schemas
+    // Try modern filter (is_dismissed=false) first, then fallback to legacy (is_active=true)
+    let suggestions: any[] | null = null;
+    let queryError: any = null;
 
-    if (type) {
-      query = query.eq('suggestion_type', type);
+    // Attempt 1: modern schema (is_dismissed)
+    {
+      let q = db
+        .from('ai_suggestions')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_dismissed', false)
+        .gt('expires_at', new Date().toISOString());
+      if (type) q = q.eq('suggestion_type', type);
+      const { data, error } = await q.order('created_at', { ascending: false }).limit(20);
+      if (!error) {
+        suggestions = data || [];
+      } else {
+        queryError = error;
+      }
     }
 
-    const { data: suggestions, error } = await query
-      .order('priority', { ascending: false })
-      .order('estimated_impact', { ascending: false })
-      .limit(20);
+    // Attempt 2: legacy schema (is_active)
+    if (suggestions === null) {
+      let q = db
+        .from('ai_suggestions')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .gt('expires_at', new Date().toISOString());
+      if (type) q = q.eq('suggestion_type', type);
+      const { data, error } = await q.order('created_at', { ascending: false }).limit(20);
+      if (!error) {
+        suggestions = data || [];
+      } else {
+        queryError = error;
+      }
+    }
 
-    if (error) {
-      console.error('Error fetching suggestions:', error);
+    if (suggestions === null) {
+      console.error('Error fetching suggestions:', queryError);
       return NextResponse.json({ 
         error: 'Failed to fetch suggestions',
-        details: error.message 
+        details: queryError?.message || 'Unknown error' 
       }, { status: 500 });
     }
 
-    // Convert database format to frontend format
-    const formattedSuggestions = suggestions?.map(suggestion => ({
-      id: suggestion.id,
-      type: suggestion.suggestion_type,
-      title: suggestion.title,
-      description: suggestion.description,
-      priority: suggestion.priority,
-      estimatedImpact: suggestion.estimated_impact,
-      reasoning: suggestion.reasoning,
-      actionableSteps: suggestion.actionable_steps || [],
-      relatedTopics: suggestion.related_topics || [],
-      confidenceScore: suggestion.confidence_score,
-      metadata: suggestion.metadata || {}
-    })) || [];
+    // Convert database format to frontend format (supports both schemas)
+    const formattedSuggestions = (suggestions || []).map((s: any) => {
+      const hasLegacy = 'title' in s || 'description' in s;
+      const hasModern = 'suggestion_title' in s || 'suggestion_content' in s;
+      // Determine title/description
+      const title = hasLegacy ? s.title : (hasModern ? s.suggestion_title : 'Suggestion');
+      const description = hasLegacy ? s.description : (hasModern ? s.suggestion_content : '');
+      // Determine priority
+      let priority: 'low' | 'medium' | 'high' = 'medium';
+      if (hasLegacy && typeof s.priority === 'string') {
+        priority = (s.priority as any) as 'low' | 'medium' | 'high';
+      } else if (typeof s.priority === 'number') {
+        // Map 1..5 to low/medium/high
+        if (s.priority >= 4) priority = 'high';
+        else if (s.priority === 3) priority = 'medium';
+        else priority = 'low';
+      }
+      // Determine estimatedImpact
+      const estimatedImpact = typeof s.estimated_impact === 'number' ? s.estimated_impact : (typeof s.priority === 'number' ? s.priority : 5);
+
+      return {
+        id: s.id,
+        type: s.suggestion_type,
+        title,
+        description,
+        priority,
+        estimatedImpact,
+        reasoning: s.reasoning || '',
+        actionableSteps: s.actionable_steps || [],
+        relatedTopics: s.related_topics || [],
+        confidenceScore: typeof s.confidence_score === 'number' ? s.confidence_score : 0.5,
+        metadata: s.metadata || s.suggestion_data || {}
+      };
+    });
 
     return NextResponse.json({
       success: true,
@@ -175,6 +235,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: auth.message }, { status: 401 });
   }
 
+  const db = (auth as any).token ? getDbForToken((auth as any).token) : supabase;
   const userId = auth.user?.id;
   if (!userId) {
     return NextResponse.json({ error: 'User ID not found' }, { status: 401 });
@@ -186,15 +247,30 @@ export async function POST(request: NextRequest) {
 
     // Check if we have recent suggestions (unless force refresh)
     if (!forceRefresh) {
-      const { data: recentSuggestions } = await supabase
-        .from('ai_suggestions')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .gt('created_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()) // 6 hours
-        .limit(1);
+      // Prefer modern schema (not dismissed) but fallback to legacy
+      let recentExists = false;
+      {
+        const { data, error } = await db
+          .from('ai_suggestions')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('is_dismissed', false)
+          .gt('created_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString())
+          .limit(1);
+        if (!error && data && data.length > 0) recentExists = true;
+      }
+      if (!recentExists) {
+        const { data, error } = await db
+          .from('ai_suggestions')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('is_active', true)
+          .gt('created_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString())
+          .limit(1);
+        if (!error && data && data.length > 0) recentExists = true;
+      }
 
-      if (recentSuggestions && recentSuggestions.length > 0) {
+      if (recentExists) {
         return NextResponse.json({
           success: true,
           message: 'Recent suggestions already exist',
@@ -204,7 +280,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get or create student profile
-    let { data: profile, error: profileError } = await supabase
+    let { data: profile, error: profileError } = await db
       .from('student_profiles')
       .select('*')
       .eq('user_id', userId)
@@ -212,7 +288,7 @@ export async function POST(request: NextRequest) {
 
     if (profileError || !profile) {
       // Create a basic profile if it doesn't exist
-      const { data: newProfile, error: createError } = await supabase
+      const { data: newProfile, error: createError } = await db
         .from('student_profiles')
         .insert({
           user_id: userId,
@@ -247,12 +323,13 @@ export async function POST(request: NextRequest) {
 
     // Store suggestions in database
     if (suggestions.length > 0) {
+      // Insert using legacy schema columns; DB has triggers/views for analytics
       const suggestionsToInsert = suggestions.map((suggestion: Suggestion) => ({
         user_id: userId,
         suggestion_type: suggestion.type,
         title: suggestion.title,
         description: suggestion.description,
-        priority: suggestion.priority,
+        priority: typeof suggestion.priority === 'string' ? suggestion.priority : (suggestion.priority >= 4 ? 'high' : suggestion.priority === 3 ? 'medium' : 'low'),
         estimated_impact: suggestion.estimatedImpact,
         reasoning: suggestion.reasoning,
         actionable_steps: suggestion.actionableSteps,
@@ -262,7 +339,7 @@ export async function POST(request: NextRequest) {
         expires_at: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString() // 6 hours
       }));
 
-      const { error: insertError } = await supabase
+      const { error: insertError } = await db
         .from('ai_suggestions')
         .insert(suggestionsToInsert);
 
@@ -279,7 +356,7 @@ export async function POST(request: NextRequest) {
     cacheSuggestions(userId, suggestions);
 
     // Log generation
-    await supabase
+    await db
       .from('suggestion_generation_logs')
       .insert({
         user_id: userId,
@@ -302,7 +379,7 @@ export async function POST(request: NextRequest) {
     
     // Log failed generation
     try {
-      await supabase
+      await db
         .from('suggestion_generation_logs')
         .insert({
           user_id: userId,
@@ -359,14 +436,16 @@ export async function PATCH(request: NextRequest) {
         interactionType = 'applied';
         break;
       case 'dismiss':
-        updateData.is_active = false;
+        // Support both schemas
+        updateData.is_active = false; // legacy
+        updateData.is_dismissed = true; // modern
         interactionType = 'dismissed';
         break;
       case 'feedback':
         interactionType = 'feedback';
         if (feedbackRating !== undefined) {
           // Store feedback in interactions table
-          await supabase
+          await db
             .from('suggestion_interactions')
             .insert({
               user_id: userId,
@@ -382,7 +461,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Update suggestion
-    const { error } = await supabase
+    const { error } = await db
       .from('ai_suggestions')
       .update(updateData)
       .eq('id', suggestionId)
@@ -398,7 +477,7 @@ export async function PATCH(request: NextRequest) {
 
     // Log interaction
     if (interactionType !== 'feedback') {
-      await supabase
+      await db
         .from('suggestion_interactions')
         .insert({
           user_id: userId,

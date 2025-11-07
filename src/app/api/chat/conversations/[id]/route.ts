@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+function getDbForRequest(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.substring(7);
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { headers: { Authorization: `Bearer ${token}` } } }
+  );
+}
 
 // DELETE /api/chat/conversations/:id - Delete conversation and all messages
 export async function DELETE(
@@ -12,6 +18,11 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const db = getDbForRequest(request);
+    if (!db) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const conversationId = params.id;
 
     if (!conversationId) {
@@ -22,7 +33,7 @@ export async function DELETE(
     }
 
     // Verify conversation exists and belongs to user
-    const { data: conversation, error: checkError } = await supabase
+    const { data: conversation, error: checkError } = await db
       .from('chat_conversations')
       .select('id, user_id, title')
       .eq('id', conversationId)
@@ -36,7 +47,7 @@ export async function DELETE(
     }
 
     // Delete all messages for this conversation
-    const { error: messagesError } = await supabase
+    const { error: messagesError } = await db
       .from('chat_messages')
       .delete()
       .eq('conversation_id', conversationId);
@@ -50,7 +61,7 @@ export async function DELETE(
     }
 
     // Delete the conversation
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await db
       .from('chat_conversations')
       .delete()
       .eq('id', conversationId);

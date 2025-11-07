@@ -1,4 +1,4 @@
-import { supabase, getCurrentUser } from '@/lib/supabase';
+import { supabaseBrowserClient as supabase, getCurrentUser } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
 
 /**

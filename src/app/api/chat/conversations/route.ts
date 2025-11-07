@@ -2,7 +2,18 @@
 // ====================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+
+function getDbForRequest(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.substring(7);
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { headers: { Authorization: `Bearer ${token}` } } }
+  );
+}
 
 // GET /api/chat/conversations - List conversations
 export async function GET(request: NextRequest) {
@@ -18,7 +29,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    let query = supabase
+    const db = getDbForRequest(request);
+    if (!db) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    let query = db
       .from('chat_conversations')
       .select('id, title, chat_type, created_at, updated_at, is_archived')
       .eq('user_id', userId)
@@ -50,6 +66,11 @@ export async function POST(request: NextRequest) {
   try {
     const { userId, title, chatType } = await request.json();
 
+    const db = getDbForRequest(request);
+    if (!db) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     if (!userId || !chatType) {
       return NextResponse.json(
         { error: 'Missing required fields: userId, chatType' },
@@ -59,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     const conversationTitle = title || 'New Conversation';
 
-    const { data: conversation, error } = await supabase
+    const { data: conversation, error } = await db
       .from('chat_conversations')
       .insert({
         user_id: userId,

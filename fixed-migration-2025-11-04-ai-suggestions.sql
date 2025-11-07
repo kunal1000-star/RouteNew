@@ -179,17 +179,29 @@ CREATE TRIGGER update_ai_suggestions_updated_at
 
 -- Insert some sample data for testing (optional - can be removed in production)
 -- This will help test the analytics system immediately
-INSERT INTO ai_suggestions (user_id, suggestion_type, suggestion_title, suggestion_content, suggestion_data, is_viewed, is_accepted, category)
-SELECT 
-  '00000000-0000-0000-0000-000000000000'::UUID, -- Placeholder user ID
-  'schedule',
-  'Optimize Your Study Schedule',
-  'Based on your recent performance, we recommend adjusting your study schedule to focus more on Mathematics during peak hours.',
-  '{"recommended_hours": 3, "focus_subject": "Mathematics", "reason": "low_performance"}',
-  true,
-  false,
-  'productivity'
-WHERE NOT EXISTS (SELECT 1 FROM ai_suggestions WHERE suggestion_type = 'schedule' LIMIT 1);
+DO $$
+DECLARE
+  u UUID;
+BEGIN
+  SELECT id INTO u FROM auth.users LIMIT 1;
+  IF u IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM ai_suggestions
+    WHERE user_id = u AND suggestion_type = 'schedule'
+  ) THEN
+    INSERT INTO ai_suggestions (
+      user_id, suggestion_type, suggestion_title, suggestion_content, suggestion_data, is_viewed, is_accepted, category
+    ) VALUES (
+      u,
+      'schedule',
+      'Optimize Your Study Schedule',
+      'Based on your recent performance, we recommend adjusting your study schedule to focus more on Mathematics during peak hours.',
+      '{"recommended_hours": 3, "focus_subject": "Mathematics", "reason": "low_performance"}',
+      true,
+      false,
+      'productivity'
+    );
+  END IF;
+END $$;
 
 -- Grant permissions
 GRANT ALL ON ai_suggestions TO authenticated;

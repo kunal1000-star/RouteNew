@@ -60,12 +60,54 @@ CREATE TABLE IF NOT EXISTS analysis_study_plan_links (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Ensure required columns exist for backward compatibility
+ALTER TABLE file_analyses ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+ALTER TABLE file_analyses ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '6 months');
+ALTER TABLE file_analyses ADD COLUMN IF NOT EXISTS embedding vector(1536);
+ALTER TABLE file_analyses ADD COLUMN IF NOT EXISTS difficulty_level TEXT;
+ALTER TABLE file_analyses ADD COLUMN IF NOT EXISTS subject TEXT DEFAULT 'Other';
+
 -- Indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_file_analyses_user_id ON file_analyses(user_id);
 CREATE INDEX IF NOT EXISTS idx_file_analyses_file_id ON file_analyses(file_id);
-CREATE INDEX IF NOT EXISTS idx_file_analyses_subject ON file_analyses(subject);
-CREATE INDEX IF NOT EXISTS idx_file_analyses_difficulty ON file_analyses(difficulty_level);
-CREATE INDEX IF NOT EXISTS idx_file_analyses_active ON file_analyses(is_active, expires_at);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+      AND table_name = 'file_analyses' 
+      AND column_name = 'subject'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_file_analyses_subject ON file_analyses(subject);
+  END IF;
+END $$;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+      AND table_name = 'file_analyses' 
+      AND column_name = 'difficulty_level'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_file_analyses_difficulty ON file_analyses(difficulty_level);
+  END IF;
+END $$;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+      AND table_name = 'file_analyses' 
+      AND column_name = 'is_active'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+      AND table_name = 'file_analyses' 
+      AND column_name = 'expires_at'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_file_analyses_active ON file_analyses(is_active, expires_at);
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_file_analyses_embedding ON file_analyses USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
 CREATE INDEX IF NOT EXISTS idx_file_uploads_user_id ON file_uploads(user_id);
@@ -80,6 +122,21 @@ ALTER TABLE file_uploads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE analysis_study_plan_links ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+-- Drop existing policies to avoid duplication errors
+DROP POLICY IF EXISTS "Users can view their own file analyses" ON file_analyses;
+DROP POLICY IF EXISTS "Users can insert their own file analyses" ON file_analyses;
+DROP POLICY IF EXISTS "Users can update their own file analyses" ON file_analyses;
+DROP POLICY IF EXISTS "Users can delete their own file analyses" ON file_analyses;
+
+DROP POLICY IF EXISTS "Users can view their own file uploads" ON file_uploads;
+DROP POLICY IF EXISTS "Users can insert their own file uploads" ON file_uploads;
+DROP POLICY IF EXISTS "Users can update their own file uploads" ON file_uploads;
+
+DROP POLICY IF EXISTS "Users can view their own study plan links" ON analysis_study_plan_links;
+DROP POLICY IF EXISTS "Users can insert their own study plan links" ON analysis_study_plan_links;
+DROP POLICY IF EXISTS "Users can update their own study plan links" ON analysis_study_plan_links;
+DROP POLICY IF EXISTS "Users can delete their own study plan links" ON analysis_study_plan_links;
+
 -- Users can only see their own file analyses
 CREATE POLICY "Users can view their own file analyses" ON file_analyses
     FOR SELECT USING (auth.uid() = user_id);
@@ -188,7 +245,7 @@ GRANT EXECUTE ON FUNCTION find_similar_file_analyses(UUID, vector, INTEGER, doub
 COMMENT ON TABLE file_analyses IS 'Stores analysis results of uploaded files with vector embeddings for semantic search';
 COMMENT ON TABLE file_uploads IS 'Tracks file upload progress and processing status';
 COMMENT ON TABLE analysis_study_plan_links IS 'Links file analyses to study topics (study_plan_id commented out)';
-COMMENT ON FUNCTION find_similar_file_analyses(UUID, vector, INTEGER, FLOAT) IS 'Find similar file analyses using vector similarity search';
+COMMENT ON FUNCTION find_similar_file_analyses(UUID, vector, INTEGER, double precision) IS 'Find similar file analyses using vector similarity search';
 
 -- Final verification
 DO $$

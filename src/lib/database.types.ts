@@ -808,6 +808,8 @@ export interface Database {
           learning_style?: string
           exam_target?: string
           last_updated: string
+          last_ai_interaction?: string
+          ai_interaction_count?: number
         }
         Insert: {
           user_id: string

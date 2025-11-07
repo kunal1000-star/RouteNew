@@ -18,6 +18,12 @@ DROP POLICY IF EXISTS "Users can insert their own chat messages" ON chat_message
 DROP POLICY IF EXISTS "Users can update their own chat messages" ON chat_messages;
 DROP POLICY IF EXISTS "Users can delete their own chat messages" ON chat_messages;
 
+-- Drop policies that may exist with different names from previous migrations
+DROP POLICY IF EXISTS "Users can view messages from their conversations" ON chat_messages;
+DROP POLICY IF EXISTS "Users can insert messages to their conversations" ON chat_messages;
+DROP POLICY IF EXISTS "Authenticated users can create conversations" ON chat_conversations;
+DROP POLICY IF EXISTS "Authenticated users can create messages" ON chat_messages;
+
 -- Create proper RLS policies for chat_conversations
 CREATE POLICY "Users can view their own chat conversations" ON chat_conversations
     FOR SELECT USING (auth.uid() = user_id);

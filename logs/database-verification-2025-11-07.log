@@ -1,0 +1,68 @@
+DATABASE SCHEMA VERIFICATION RESULTS
+=====================================
+Date: 11/6/2025
+Time: 10:36:00 PM
+
+❌ Database Connectivity: FAIL
+    Could not find the function public.exec_sql(query) in the schema cache
+
+❌ Vector Extension: FAIL
+    Could not find the function public.exec_sql(query) in the schema cache
+
+❌ Table: ai_suggestions: FAIL
+    Missing
+
+❌ Table: student_profiles: FAIL
+    Missing
+
+❌ Table: suggestion_interactions: FAIL
+    Missing
+
+❌ Table: suggestion_generation_logs: FAIL
+    Missing
+
+❌ Table: file_analyses: FAIL
+    Missing
+
+❌ Table: file_uploads: FAIL
+    Missing
+
+❌ Table: analysis_study_plan_links: FAIL
+    Missing
+
+❌ RLS Policy: ai_suggestions.Users can view their own suggestions: FAIL
+    Missing
+
+❌ RLS Policy: ai_suggestions.Users can insert their own suggestions: FAIL
+    Missing
+
+❌ RLS Policy: student_profiles.Users can view their own student profile: FAIL
+    Missing
+
+❌ RLS Policy: file_analyses.Users can view their own file analyses: FAIL
+    Missing
+
+❌ RLS Policy: file_analyses.Users can insert their own file analyses: FAIL
+    Missing
+
+❌ Index: idx_ai_suggestions_user_id: FAIL
+    Missing
+
+❌ Index: idx_file_analyses_user_id: FAIL
+    Missing
+
+❌ Index: idx_student_profiles_user_id: FAIL
+    Missing
+
+❌ Index: idx_file_analyses_embedding: FAIL
+    Missing
+
+✅ System Prompts: PASS
+    Found 4 prompts
+
+
+Total tests: 19
+Passed: 1
+Failed: 18
+Success rate: 5%
+

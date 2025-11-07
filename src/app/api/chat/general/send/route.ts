@@ -2,7 +2,18 @@
 // ========================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+
+function getDbForRequest(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.substring(7);
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { headers: { Authorization: `Bearer ${token}` } } }
+  );
+}
 import type { Database } from '@/lib/database.types';
 
 // Graceful AI service manager initialization
@@ -65,7 +76,11 @@ export async function POST(request: NextRequest) {
     // If no conversationId provided, create new conversation
     let finalConversationId = conversationId;
     if (!finalConversationId) {
-      const { data: newConversation, error } = await supabase
+      const db = getDbForRequest(request);
+      if (!db) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      const { data: newConversation, error } = await db
         .from('chat_conversations')
         .insert({
           user_id: userId,
@@ -83,7 +98,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Store user message
-    const { error: userMessageError } = await supabase
+    const db2 = getDbForRequest(request);
+    if (!db2) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const { error: userMessageError } = await db2
       .from('chat_messages')
       .insert({
         conversation_id: finalConversationId,
@@ -121,7 +140,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Store AI response
-    const { error: aiMessageError } = await supabase
+    const db3 = getDbForRequest(request);
+    if (!db3) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const { error: aiMessageError } = await db3
           .from('chat_messages')
           .insert({
             conversation_id: finalConversationId,
@@ -139,7 +162,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Update conversation timestamp
-    await supabase
+    const db4 = getDbForRequest(request);
+    if (!db4) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    await db4
           .from('chat_conversations')
           .update({ updated_at: new Date().toISOString() } as Database['public']['Tables']['chat_conversations']['Update'])
           .eq('id', finalConversationId);

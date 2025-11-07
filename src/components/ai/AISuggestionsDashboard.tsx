@@ -96,7 +96,16 @@ export function AISuggestionsDashboard({
       
       console.log('📡 Suggestions API response:', result);
       
-if (!result.success) {
+      if (!result.success) {
+        if ((result as any).isAuthError) {
+          toast({
+            title: 'Authentication required',
+            description: 'Please sign in to view AI suggestions.',
+            variant: 'destructive'
+          });
+          setSuggestions([]);
+          return;
+        }
         throw new Error(result.error || 'Failed to fetch suggestions');
       }
 
@@ -147,6 +156,14 @@ if (!result.success) {
       console.log('📡 Generation API response:', result);
 
 if (!result.success) {
+        if ((result as any).isAuthError) {
+          toast({
+            title: 'Authentication required',
+            description: 'Please sign in to generate AI suggestions.',
+            variant: 'destructive'
+          });
+          return;
+        }
         throw new Error(result.error || 'Failed to generate suggestions');
       }
       
@@ -190,6 +207,14 @@ if (!result.success) {
       });
 
 if (!result.success) {
+        if ((result as any).isAuthError) {
+          toast({
+            title: 'Authentication required',
+            description: 'Please sign in to apply suggestions.',
+            variant: 'destructive'
+          });
+          return;
+        }
         throw new Error(result.error || 'Failed to apply suggestion');
       }
       
@@ -229,6 +254,14 @@ if (!result.success) {
       });
 
 if (!result.success) {
+        if ((result as any).isAuthError) {
+          toast({
+            title: 'Authentication required',
+            description: 'Please sign in to dismiss suggestions.',
+            variant: 'destructive'
+          });
+          return;
+        }
         throw new Error(result.error || 'Failed to dismiss suggestion');
       }
       
@@ -272,6 +305,14 @@ if (!result.success) {
       });
 
 if (!result.success) {
+        if ((result as any).isAuthError) {
+          toast({
+            title: 'Authentication required',
+            description: 'Please sign in to submit feedback.',
+            variant: 'destructive'
+          });
+          return;
+        }
         throw new Error(result.error || 'Failed to submit feedback');
       }
       

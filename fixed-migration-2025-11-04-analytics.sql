@@ -130,7 +130,17 @@ CREATE INDEX IF NOT EXISTS idx_user_goals_deadline ON user_goals(deadline);
 CREATE INDEX IF NOT EXISTS idx_performance_metrics_user_id ON performance_metrics(user_id);
 CREATE INDEX IF NOT EXISTS idx_performance_metrics_type ON performance_metrics(metric_type);
 CREATE INDEX IF NOT EXISTS idx_performance_metrics_recorded_at ON performance_metrics(recorded_at DESC);
-CREATE INDEX IF NOT EXISTS idx_performance_metrics_subject ON performance_metrics(subject);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+      AND table_name = 'performance_metrics' 
+      AND column_name = 'subject'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_performance_metrics_subject ON performance_metrics(subject);
+  END IF;
+END $$;
 
 -- Learning velocity indexes
 CREATE INDEX IF NOT EXISTS idx_learning_velocity_user_id ON learning_velocity(user_id);
@@ -292,7 +302,7 @@ SELECT
   SUM(duration) as total_study_minutes,
   COUNT(CASE WHEN event_type = 'question_answer' THEN 1 END) as questions_attempted,
   COUNT(CASE WHEN event_type = 'ai_interaction' THEN 1 END) as ai_features_used,
-  AVG(engagement_score) as avg_engagement_score
+  AVG((event_data->>'engagement_score')::DECIMAL) as avg_engagement_score
 FROM analytics_events
 WHERE timestamp >= CURRENT_DATE - INTERVAL '12 weeks'
 GROUP BY user_id, DATE_TRUNC('week', timestamp);
@@ -435,7 +445,7 @@ AS $$
 BEGIN
   RETURN QUERY
   SELECT 
-    pm.subject,
+    COALESCE(pm.subject, pm.metric_context->>'subject') as subject_name,
     ROUND(
       COUNT(CASE WHEN pm.metric_context->>'is_correct' = 'true' THEN 1 END) * 100.0 / 
       NULLIF(COUNT(*), 0), 2
@@ -447,7 +457,7 @@ BEGIN
   WHERE pm.user_id = user_uuid 
     AND pm.metric_type = 'question_attempt'
     AND pm.recorded_at >= CURRENT_DATE - INTERVAL '30 days'
-  GROUP BY pm.subject
+  GROUP BY COALESCE(pm.subject, pm.metric_context->>'subject')
   ORDER BY accuracy_rate DESC
   LIMIT limit_count;
 END;
