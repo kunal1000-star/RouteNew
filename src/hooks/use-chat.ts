@@ -250,7 +250,7 @@ export function useChat() {
 
       // Send to backend
       const request: SendMessageRequest = {
-        userId: user.id,
+        // userId omitted; derived server-side
         conversationId: currentConversationId,
         message: message.trim(),
         chatType: 'general',

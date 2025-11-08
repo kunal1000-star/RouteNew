@@ -39,17 +39,17 @@ const defaultOverrides: ModelOverride[] = [
   { id: '8', featureNumber: 8, featureName: 'Progress Analysis', currentModel: 'cerebras:llama-3.3-70b', hasChanges: false },
   { id: '9', featureNumber: 9, featureName: 'Concept Explanation', currentModel: 'groq:llama-3.3-70b-versatile', hasChanges: false },
   { id: '10', featureNumber: 10, featureName: 'Problem Solving', currentModel: 'mistral:mistral-large-latest', hasChanges: false },
-  { id: '11', featureNumber: 11, featureName: 'Test Preparation', currentModel: 'gemini:gemini-1.5-flash', hasChanges: false },
+  { id: '11', featureNumber: 11, featureName: 'Test Preparation', currentModel: 'gemini:gemini-2.5-flash', hasChanges: false },
   { id: '12', featureNumber: 12, featureName: 'Topic Summarization', currentModel: 'openrouter:openai/gpt-3.5-turbo', hasChanges: false },
   { id: '13', featureNumber: 13, featureName: 'Exam Strategies', currentModel: 'groq:llama-3.3-70b-versatile', hasChanges: false },
   { id: '14', featureNumber: 14, featureName: 'Weak Area Identification', currentModel: 'cerebras:llama-3.3-70b', hasChanges: false },
-  { id: '15', featureNumber: 15, featureName: 'Learning Path Generation', currentModel: 'gemini:gemini-1.5-flash', hasChanges: false },
+  { id: '15', featureNumber: 15, featureName: 'Learning Path Generation', currentModel: 'gemini:gemini-2.5-flash', hasChanges: false },
   { id: '16', featureNumber: 16, featureName: 'Performance Insights', currentModel: 'mistral:mistral-medium-latest', hasChanges: false },
   { id: '17', featureNumber: 17, featureName: 'Curriculum Planning', currentModel: 'openrouter:openai/gpt-3.5-turbo', hasChanges: false },
   { id: '18', featureNumber: 18, featureName: 'Error Analysis', currentModel: 'groq:llama-3.3-70b-versatile', hasChanges: false },
   { id: '19', featureNumber: 19, featureName: 'Adaptive Tutoring', currentModel: 'cerebras:llama-3.3-70b', hasChanges: false },
   { id: '20', featureNumber: 20, featureName: 'Real-time Feedback', currentModel: 'mistral:mistral-small-latest', hasChanges: false },
-  { id: '21', featureNumber: 21, featureName: 'Knowledge Assessment', currentModel: 'gemini:gemini-1.5-flash', hasChanges: false },
+  { id: '21', featureNumber: 21, featureName: 'Knowledge Assessment', currentModel: 'gemini:gemini-2.5-flash', hasChanges: false },
   { id: '22', featureNumber: 22, featureName: 'Multi-Modal Analysis', currentModel: 'openrouter:openai/gpt-4o-mini', hasChanges: false }
 ];
 
@@ -60,9 +60,8 @@ const modelOptions: ModelOption[] = [
   { value: 'groq:mixtral-8x7b-32768', label: 'Mixtral 8x7B 32768', provider: 'Groq' },
   
   // Gemini Models
+  { value: 'gemini:gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'Gemini' },
   { value: 'gemini:gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite', provider: 'Gemini' },
-  { value: 'gemini:gemini-1.5-flash', label: 'Gemini 1.5 Flash', provider: 'Gemini' },
-  { value: 'gemini:gemini-1.5-pro', label: 'Gemini 1.5 Pro', provider: 'Gemini' },
   
   // Cerebras Models
   { value: 'cerebras:llama-3.3-70b', label: 'Llama 3.3 70B', provider: 'Cerebras' },

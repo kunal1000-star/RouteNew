@@ -34,7 +34,7 @@ export interface CreateConversationRequest {
 }
 
 export interface SendMessageRequest {
-  userId: string;
+  userId?: string; // Derived server-side from Supabase JWT
   conversationId: string;
   message: string;
   chatType: 'general' | 'study_assistant';

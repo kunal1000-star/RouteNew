@@ -30,7 +30,7 @@ const AVAILABLE_PROVIDERS = {
     name: 'gemini',
     clientFile: 'gemini-client',
     testFile: null,
-    models: ['gemini-1.5-flash', 'gemini-1.5-pro'],
+    models: ['gemini-2.5-flash', 'gemini-2.0-flash-lite'],
     status: 'needs_testing'
   },
   openrouter: {

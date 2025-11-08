@@ -589,7 +589,7 @@ export default function AdminPanel() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="llama-3.3-70b-versatile">Llama 3.3 70B (Groq)</SelectItem>
-                            <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash</SelectItem>
+                            <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash</SelectItem>
                             <SelectItem value="llama-3.1-8b">Llama 3.1 8B (Cerebras)</SelectItem>
                             <SelectItem value="command">Command (Cohere)</SelectItem>
                           </SelectContent>

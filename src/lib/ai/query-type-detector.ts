@@ -329,7 +329,7 @@ export class QueryTypeDetector {
   getSuggestedModel(queryType: QueryType): string {
     switch (queryType) {
       case 'time_sensitive':
-        return 'gemini-2.0-flash-lite';
+        return 'gemini-2.5-flash';
       
       case 'app_data':
         return 'llama-3.3-70b';

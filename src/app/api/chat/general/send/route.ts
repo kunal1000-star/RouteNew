@@ -58,17 +58,28 @@ export async function POST(request: NextRequest) {
     console.log('Incoming request headers:', request.headers);
     const requestBody = await request.json();
     console.log('Parsed request body:', requestBody);
-    const { userId, conversationId, message, chatType } = requestBody;
+    const { conversationId, message, chatType } = requestBody;
 
-    if (!userId || !message || !chatType) {
+    if (!message || !chatType) {
       return NextResponse.json(
-        { error: 'Missing required fields: userId, message, chatType' },
+        { error: 'Missing required fields: message, chatType' },
         { status: 400 }
       );
     }
 
+    // Derive authenticated user from Supabase JWT
+    const dbAuth = getDbForRequest(request);
+    if (!dbAuth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const { data: authData, error: authError } = await dbAuth.auth.getUser();
+    if (authError || !authData?.user) {
+      return NextResponse.json({ error: 'Unauthorized: invalid or missing token' }, { status: 401 });
+    }
+    const userId = authData.user.id;
+
     // Additional logging for debugging
-    console.log('UserId:', userId);
+    console.log('UserId (derived):', userId);
     console.log('ConversationId:', conversationId);
     console.log('Message:', message);
     console.log('ChatType:', chatType);
@@ -76,10 +87,7 @@ export async function POST(request: NextRequest) {
     // If no conversationId provided, create new conversation
     let finalConversationId = conversationId;
     if (!finalConversationId) {
-      const db = getDbForRequest(request);
-      if (!db) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
+      const db = getDbForRequest(request)!;
       const { data: newConversation, error } = await db
         .from('chat_conversations')
         .insert({
@@ -95,6 +103,17 @@ export async function POST(request: NextRequest) {
       }
 
       finalConversationId = newConversation.id;
+    } else {
+      // Validate ownership of provided conversationId
+      const db = getDbForRequest(request)!;
+      const { data: conv, error: convErr } = await db
+        .from('chat_conversations')
+        .select('id, user_id')
+        .eq('id', finalConversationId)
+        .single();
+      if (convErr || !conv || conv.user_id !== userId) {
+        return NextResponse.json({ error: 'Forbidden: conversation does not belong to user' }, { status: 403 });
+      }
     }
 
     // Store user message
@@ -171,12 +190,27 @@ export async function POST(request: NextRequest) {
           .update({ updated_at: new Date().toISOString() } as Database['public']['Tables']['chat_conversations']['Update'])
           .eq('id', finalConversationId);
 
+    // Normalize AI response to expected schema
+    const normalized = {
+      content: aiResponse.content,
+      model_used: aiResponse.model_used ?? aiResponse.model ?? 'unknown',
+      provider_used: aiResponse.provider_used ?? aiResponse.provider ?? 'unknown',
+      tokens_used: aiResponse.tokens_used,
+      latency_ms: aiResponse.latency_ms,
+      query_type: aiResponse.query_type ?? 'general',
+      web_search_enabled: aiResponse.web_search_enabled ?? false,
+      fallback_used: aiResponse.fallback_used ?? !initialized,
+      cached: aiResponse.cached ?? false,
+      isTimeSensitive: aiResponse.isTimeSensitive ?? false,
+      language: aiResponse.language ?? 'english'
+    };
+
     return NextResponse.json({
-      response: aiResponse,
-      conversationId: finalConversationId,
-      metadata: {
-        serviceInitialized: initialized,
-        fallbackMode: !initialized
+      success: true,
+      data: {
+        response: normalized,
+        conversationId: finalConversationId,
+        timestamp: new Date().toISOString()
       }
     });
 

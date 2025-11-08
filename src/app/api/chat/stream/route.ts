@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
       async start(controller) {
         const abort = request.signal;
         try {
-          const { chatService } = await getInitializedChatService();
+          const chatService = await getInitializedChatService();
 
           // Send initial metadata
           const initialChunk = {

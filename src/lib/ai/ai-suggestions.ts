@@ -42,7 +42,7 @@ export interface StudentProfile {
 // Smart Topic Suggestions
 export async function generateSmartTopicSuggestions(profile: StudentProfile): Promise<Suggestion[]> {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
 
     const prompt = `
 Based on this student profile, suggest 5 specific study topics they should focus on:
@@ -109,7 +109,7 @@ const jsonMatch = textResponse.match(/\[[\s\S]*\]/);
 // Weak Area Identification
 export async function identifyWeakAreas(profile: StudentProfile): Promise<Suggestion[]> {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
 
     const prompt = `
 Analyze this student's performance data to identify specific weak areas and provide improvement strategies:
@@ -175,7 +175,7 @@ const jsonMatch = textResponse.match(/\[[\s\S]*\]/);
 // Performance Insights
 export async function generatePerformanceInsights(profile: StudentProfile): Promise<Suggestion[]> {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
 
     const prompt = `
 Generate data-driven performance insights for this student:
@@ -239,7 +239,7 @@ const jsonMatch = textResponse.match(/\[[\s\S]*\]/);
 // Performance Analysis
 export async function generatePerformanceAnalysis(profile: StudentProfile): Promise<Suggestion[]> {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
 
     const prompt = `
 Provide comprehensive performance analysis for this student:
@@ -305,7 +305,7 @@ const jsonMatch = textResponse.match(/\[[\s\S]*\]/);
 // Personalized Recommendations
 export async function generatePersonalizedRecommendations(profile: StudentProfile): Promise<Suggestion[]> {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
 
     const prompt = `
 Generate personalized study recommendations for this student:

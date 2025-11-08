@@ -130,7 +130,7 @@ function getProviderBaseUrl(provider: AIProvider): string {
 function getProviderModels(provider: AIProvider) {
   const modelMap: Record<AIProvider, { chat: string }> = {
     groq: { chat: 'llama-3.3-70b-versatile' },
-    gemini: { chat: 'gemini-1.5-flash' },
+    gemini: { chat: 'gemini-2.5-flash' },
     cerebras: { chat: 'llama-3.3-70b' },
     cohere: { chat: 'command' },
     mistral: { chat: 'mistral-medium-latest' },

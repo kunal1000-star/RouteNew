@@ -303,11 +303,8 @@ export class GeminiClient {
    */
   getAvailableModels(): string[] {
     return [
-      'gemini-2.0-flash-exp',
       'gemini-2.0-flash-lite',
-      'gemini-1.5-pro',
-      'gemini-1.5-flash',
-      'gemini-1.0-pro'
+      'gemini-2.5-flash'
     ];
   }
 
@@ -334,45 +331,34 @@ export class GeminiClient {
     supportsImageInput: boolean;
     maxTokens: number;
   } {
-    const modelCapabilities: Record<string, any> = {
-      'gemini-2.0-flash-exp': {
-        supportsStreaming: true,
-        supportsFunctionCalling: true,
-        supportsWebSearch: true,
-        supportsImageInput: true,
-        maxTokens: 1048576
-      },
-      'gemini-2.0-flash-lite': {
+    const modelCapabilities: Record<string, {
+      supportsStreaming: boolean;
+      supportsFunctionCalling: boolean;
+      supportsWebSearch: boolean;
+      supportsImageInput: boolean;
+      maxTokens: number;
+    }> = {
+      "gemini-2.0-flash-lite": {
         supportsStreaming: true,
         supportsFunctionCalling: true,
         supportsWebSearch: true,
         supportsImageInput: false,
         maxTokens: 8192
       },
-      'gemini-1.5-pro': {
+      "gemini-2.5-flash": {
         supportsStreaming: true,
         supportsFunctionCalling: true,
         supportsWebSearch: false,
         supportsImageInput: true,
         maxTokens: 1048576
-      },
-      'gemini-1.5-flash': {
-        supportsStreaming: true,
-        supportsFunctionCalling: true,
-        supportsWebSearch: false,
-        supportsImageInput: true,
-        maxTokens: 1048576
-      },
-      'gemini-1.0-pro': {
-        supportsStreaming: false,
-        supportsFunctionCalling: true,
-        supportsWebSearch: false,
-        supportsImageInput: true,
-        maxTokens: 32768
       }
     };
 
-    return modelCapabilities[model] || {
+    if (model in modelCapabilities) {
+      return modelCapabilities[model];
+    }
+
+    return {
       supportsStreaming: true,
       supportsFunctionCalling: true,
       supportsWebSearch: false,

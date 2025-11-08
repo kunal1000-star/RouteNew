@@ -219,7 +219,7 @@ describe('Chat System Integration Tests', () => {
           name: 'gemini' as AIProvider,
           chat: vi.fn().mockResolvedValue({
             content: 'Gemini response',
-            model_used: 'gemini-1.5-flash',
+            model_used: 'gemini-2.5-flash',
             provider: 'gemini'
           }),
           healthCheck: vi.fn().mockResolvedValue({ healthy: true, responseTime: 600 })

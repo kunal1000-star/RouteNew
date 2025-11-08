@@ -503,25 +503,25 @@ export class AIServiceManager {
         cohere: 'command',
         mistral: 'mistral-large-latest',
         openrouter: 'openai/gpt-3.5-turbo',
-        google: 'gemini-1.5-flash'
+        google: 'gemini-2.0-flash-lite'
       },
       app_data: {
         groq: 'llama-3.3-70b-versatile',
-        gemini: 'gemini-1.5-flash',
+        gemini: 'gemini-2.5-flash',
         cerebras: 'llama-3.3-70b',
         cohere: 'command',
         mistral: 'mistral-medium-latest',
         openrouter: 'openai/gpt-3.5-turbo',
-        google: 'gemini-1.5-flash'
+        google: 'gemini-2.5-flash'
       },
       general: {
         groq: 'llama-3.3-70b-versatile',
-        gemini: 'gemini-1.5-flash',
+        gemini: 'gemini-2.5-flash',
         cerebras: 'llama-3.1-8b',
         cohere: 'command-light',
         mistral: 'mistral-small-latest',
         openrouter: 'openai/gpt-3.5-turbo',
-        google: 'gemini-1.5-flash'
+        google: 'gemini-2.5-flash'
       }
     };
 

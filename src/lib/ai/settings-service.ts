@@ -25,7 +25,7 @@ export const getDefaultUserSettings = (userId: string): UserSettings => ({
       concurrentRequests: 5
     },
     modelPreferences: {
-      primaryModel: 'gemini:gemini-2.0-flash',
+      primaryModel: 'gemini:gemini-2.5-flash',
       fallbackModel: 'mistral:mistral-medium-latest',
       imageAnalysisModel: 'pixtral-12b',
       reasoningModel: 'mistral-large-latest'

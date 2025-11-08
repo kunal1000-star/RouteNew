@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { chatService } = await getInitializedChatService();
+    const chatService = await getInitializedChatService();
 
     // Build study context when personal mode is enabled
     let studyContext: any = undefined;

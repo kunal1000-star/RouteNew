@@ -209,7 +209,7 @@ export default function StudyBuddy({ userId, className }: StudyBuddyProps) {
 
       const aiMsgId = `ai-${Date.now()}`;
       setCurrentStreamingMessageId(aiMsgId);
-      setMessages(prev => [...prev, { id: aiMsgId, role: 'assistant', content: '', timestamp: new Date().toISOString() }]);
+      setMessages(prev => [...prev, { id: aiMsgId, role: 'assistant', content: '', timestamp: new Date().toISOString(), isLoading: true, streaming: true }]);
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -230,9 +230,53 @@ export default function StudyBuddy({ userId, className }: StudyBuddyProps) {
           const payload = line.slice(5).trim();
           try {
             const evt = JSON.parse(payload);
-            if (evt.type === 'content' && typeof evt.data === 'string') append(evt.data);
-            if (evt.type === 'end') { ended = true; }
-            if (evt.type === 'error') throw new Error(evt.error?.message || 'Stream error');
+            const w: any = typeof window !== 'undefined' ? window : {};
+            w.__studySeq = w.__studySeq || {};
+            w.__studyTimers = w.__studyTimers || {};
+            if (!w.__studySeq[aiMsgId]) w.__studySeq[aiMsgId] = [];
+            w.__studySeq[aiMsgId].push(evt.type);
+
+            if (evt.type === 'start') {
+              setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, isLoading: true, streaming: true } : m));
+              if (!w.__studyTimers[aiMsgId]) {
+                w.__studyTimers[aiMsgId] = setTimeout(() => {
+                  console.warn('StudyBuddy timeout without content/end', { seq: w.__studySeq[aiMsgId] });
+                  setMessages(prev => prev.map(m => m.id === aiMsgId ? {
+                    ...m,
+                    isLoading: false,
+                    streaming: false,
+                    content: m.content && m.content.length > 0 ? m.content : 'Response timed out. Please try again.'
+                  } : m));
+                  delete w.__studyTimers[aiMsgId];
+                }, 12000);
+              }
+            }
+            if (evt.type === 'content' && typeof evt.data === 'string') {
+              if (w.__studyTimers[aiMsgId]) { clearTimeout(w.__studyTimers[aiMsgId]); delete w.__studyTimers[aiMsgId]; }
+              setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, isLoading: false } : m));
+              append(evt.data);
+            }
+            if (evt.type === 'metadata') {
+              setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, isLoading: false } : m));
+            }
+            if (evt.type === 'end') {
+              ended = true;
+              if (w.__studyTimers[aiMsgId]) { clearTimeout(w.__studyTimers[aiMsgId]); delete w.__studyTimers[aiMsgId]; }
+              setMessages(prev => prev.map(m => m.id === aiMsgId ? {
+                ...m,
+                streaming: false,
+                isLoading: false,
+                content: m.content && m.content.length > 0 ? m.content : 'I couldn\'t generate a response this time. Please try again.'
+              } : m));
+              if (w.__studySeq[aiMsgId] && !w.__studySeq[aiMsgId].includes('content')) {
+                console.warn('StudyBuddy ended without content', { seq: w.__studySeq[aiMsgId] });
+              }
+              delete w.__studySeq[aiMsgId];
+            }
+            if (evt.type === 'error') {
+              if (w.__studyTimers[aiMsgId]) { clearTimeout(w.__studyTimers[aiMsgId]); delete w.__studyTimers[aiMsgId]; }
+              throw new Error(evt.error?.message || 'Stream error');
+            }
           } catch {}
         }
       }
@@ -785,7 +829,14 @@ export default function StudyBuddy({ userId, className }: StudyBuddyProps) {
                     aria-roledescription="chat message"
                   >
                     <div className="text-sm">
-                        <RichContent text={message.content} />
+                        {message.isLoading ? (
+                          <div className="text-muted-foreground flex items-center gap-2">
+                            <span className="inline-block h-3 w-3 rounded-full bg-muted-foreground/50 animate-pulse" />
+                            <span>Getting response...</span>
+                          </div>
+                        ) : (
+                          <RichContent text={message.content} />
+                        )}
                       </div>
                     
                     {/* Message metadata for AI responses */}

@@ -1,11 +1,22 @@
-// Get messages for a conversation
-// GET /api/chat/messages?conversationId=xxx
-// DELETE /api/chat/conversations/:id
+// Messages API for Chat Conversations
+// ===================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+import type { Database } from '@/lib/database.types';
 
-// GET /api/chat/messages - Get messages for a conversation
+function getDbForRequest(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.substring(7);
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { headers: { Authorization: `Bearer ${token}` } } }
+  );
+}
+
+// GET /api/chat/messages?conversationId=xxx - Get messages for a conversation that belongs to the current user
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -18,7 +29,29 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data: messages, error } = await supabase
+    const db = getDbForRequest(request);
+    if (!db) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Derive authenticated user
+    const { data: authData, error: authError } = await db.auth.getUser();
+    if (authError || !authData?.user) {
+      return NextResponse.json({ error: 'Unauthorized: invalid or missing token' }, { status: 401 });
+    }
+    const userId = authData.user.id;
+
+    // Validate ownership
+    const { data: conv, error: convErr } = await db
+      .from('chat_conversations')
+      .select('id, user_id')
+      .eq('id', conversationId)
+      .single();
+    if (convErr || !conv || conv.user_id !== userId) {
+      return NextResponse.json({ error: 'Forbidden: conversation does not belong to user' }, { status: 403 });
+    }
+
+    const { data: messages, error } = await db
       .from('chat_messages')
       .select('*')
       .eq('conversation_id', conversationId)
@@ -38,7 +71,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// DELETE /api/chat/conversations/:id - Delete a conversation
+// DELETE /api/chat/messages?id=xxx - Delete a conversation that belongs to the current user (and its messages)
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -51,8 +84,30 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    const db = getDbForRequest(request);
+    if (!db) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Derive authenticated user
+    const { data: authData, error: authError } = await db.auth.getUser();
+    if (authError || !authData?.user) {
+      return NextResponse.json({ error: 'Unauthorized: invalid or missing token' }, { status: 401 });
+    }
+    const userId = authData.user.id;
+
+    // Validate ownership before delete
+    const { data: conv, error: convErr } = await db
+      .from('chat_conversations')
+      .select('id, user_id')
+      .eq('id', conversationId)
+      .single();
+    if (convErr || !conv || conv.user_id !== userId) {
+      return NextResponse.json({ error: 'Forbidden: conversation does not belong to user' }, { status: 403 });
+    }
+
     // Delete messages first (cascade)
-    const { error: messagesError } = await supabase
+    const { error: messagesError } = await db
       .from('chat_messages')
       .delete()
       .eq('conversation_id', conversationId);
@@ -62,7 +117,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete conversation
-    const { error: conversationError } = await supabase
+    const { error: conversationError } = await db
       .from('chat_conversations')
       .delete()
       .eq('id', conversationId);

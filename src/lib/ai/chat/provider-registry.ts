@@ -360,7 +360,7 @@ export class UnifiedProviderRegistry implements ProviderRegistry {
         errorRate: 0,
         rateLimitStatus: {},
         capabilities: {
-          supportsStreaming: provider === 'groq' || provider === 'openrouter', // Only some support streaming
+          supportsStreaming: (provider === 'groq' || provider === 'openrouter' || provider === 'gemini'), // Allow streaming, but guard at model-level to exclude embeddings
           supportsSystemMessage: true,
           supportsFunctionCalling: false,
           supportsImageInput: provider === 'gemini',

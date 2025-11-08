@@ -59,7 +59,7 @@ export function getProviderDisplayName(model: string): string {
   const providerMap: Record<string, string> = {
     'llama-3.3-70b-versatile': 'Groq Llama 3.3 70B',
     'gemini-2.0-flash-lite': 'Gemini 2.0 Flash-Lite',
-    'gemini-1.5-flash': 'Gemini 1.5 Flash',
+    'gemini-2.5-flash': 'Gemini 2.5 Flash',
     'llama-3.3-70b': 'Cerebras Llama 3.3 70B',
     'llama-3.1-8b': 'Cerebras Llama 3.1 8B',
     'command': 'Cohere Command',

@@ -15,24 +15,23 @@ function getDbForRequest(request: NextRequest) {
   );
 }
 
-// GET /api/chat/conversations - List conversations
+// GET /api/chat/conversations - List conversations for current user
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
     const chatType = searchParams.get('chatType');
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Missing userId parameter' },
-        { status: 400 }
-      );
-    }
 
     const db = getDbForRequest(request);
     if (!db) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Derive authenticated user from Supabase JWT
+    const { data: authData, error: authError } = await db.auth.getUser();
+    if (authError || !authData?.user) {
+      return NextResponse.json({ error: 'Unauthorized: invalid or missing token' }, { status: 401 });
+    }
+    const userId = authData.user.id;
 
     let query = db
       .from('chat_conversations')
@@ -61,22 +60,29 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/chat/conversations - Create new conversation
+// POST /api/chat/conversations - Create new conversation for current user
 export async function POST(request: NextRequest) {
   try {
-    const { userId, title, chatType } = await request.json();
+    const { title, chatType } = await request.json();
 
     const db = getDbForRequest(request);
     if (!db) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!userId || !chatType) {
+    if (!chatType) {
       return NextResponse.json(
-        { error: 'Missing required fields: userId, chatType' },
+        { error: 'Missing required field: chatType' },
         { status: 400 }
       );
     }
+
+    // Derive authenticated user
+    const { data: authData, error: authError } = await db.auth.getUser();
+    if (authError || !authData?.user) {
+      return NextResponse.json({ error: 'Unauthorized: invalid or missing token' }, { status: 401 });
+    }
+    const userId = authData.user.id;
 
     const conversationTitle = title || 'New Conversation';
 

@@ -90,14 +90,44 @@ export async function POST(request: NextRequest) {
       .eq('user_id', session.user.id)
       .eq('file_id', fileId);
 
-    // Generate embedding for semantic search (if Cohere is available)
-    let embedding = null;
+    // Generate embeddings for semantic search
+    let embeddings: {
+      content_embedding: number[] | null;
+      summary_embedding: number[] | null;
+      topics_embedding: number[] | null;
+    } = {
+      content_embedding: null,
+      summary_embedding: null,
+      topics_embedding: null
+    };
+    
     try {
-      // This would typically use Cohere to generate embeddings
-      // For now, we'll skip this step
-      console.log('Embedding generation would happen here');
+      // Import unified embedding service dynamically
+      const { unifiedEmbeddingService } = await import('@/lib/ai/unified-embedding-service');
+      
+      // Generate embeddings for content, summary, and topics
+      const textsToEmbed = [
+        extractionResult.text, // Full content
+        analysisResult.analysis.summary || '', // Summary
+        (analysisResult.analysis.topics || []).join(' ') // Topics as text
+      ];
+      
+      const embeddingResult = await unifiedEmbeddingService.generateEmbeddings({
+        texts: textsToEmbed,
+        provider: 'cohere',
+        timeout: 30000
+      });
+      
+      embeddings = {
+        content_embedding: embeddingResult.embeddings[0],
+        summary_embedding: embeddingResult.embeddings[1] || null,
+        topics_embedding: embeddingResult.embeddings[2] || null
+      };
+      
+      console.log(`Generated embeddings for file ${fileId} with ${embeddingResult.dimensions} dimensions using ${embeddingResult.provider}`);
     } catch (error) {
-      console.warn('Could not generate embedding:', error);
+      console.warn('Could not generate embeddings:', error);
+      // Continue without embeddings - not critical for file analysis
     }
 
     // Store analysis result in database
@@ -120,7 +150,9 @@ export async function POST(request: NextRequest) {
         summary: analysisResult.analysis.summary,
         key_insights: analysisResult.analysis.keyInsights,
         ai_recommendations: analysisResult.analysis.aiRecommendations,
-        embedding: embedding
+        content_embedding: embeddings.content_embedding,
+        summary_embedding: embeddings.summary_embedding,
+        topics_embedding: embeddings.topics_embedding
       })
       .select()
       .single();

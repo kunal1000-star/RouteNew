@@ -82,6 +82,12 @@ export abstract class BaseUnifiedProvider implements IUnifiedProvider {
 
   // Streaming chat implementation
   async *streamChat(request: ChatRequest): AsyncIterable<ChatStreamChunk> {
+    // Guard: skip streaming for embedding models or providers without streaming capability
+    const modelName = (this.config?.models?.chat || '').toLowerCase();
+    if (modelName.includes('embed') || modelName.includes('embedding')) {
+      throw this.createError('STREAMING_NOT_SUPPORTED', 'Embedding models do not support streaming', false);
+    }
+
     try {
       // Validate provider supports streaming
       const capabilities = this.getCapabilities();

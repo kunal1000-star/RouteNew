@@ -280,7 +280,7 @@ export default function GeneralChat({ className }: GeneralChatProps) {
       // Create assistant placeholder
       const aiMsgId = `ai-${Date.now()}`;
       setCurrentStreamingMessageId(aiMsgId);
-      setMessages(prev => [...prev, { id: aiMsgId, role: 'assistant', content: '', timestamp: new Date().toISOString() }]);
+      setMessages(prev => [...prev, { id: aiMsgId, role: 'assistant', content: '', timestamp: new Date().toISOString(), isLoading: true, streaming: true }]);
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -301,9 +301,58 @@ export default function GeneralChat({ className }: GeneralChatProps) {
           const payload = line.slice(5).trim();
           try {
             const evt = JSON.parse(payload);
-            if (evt.type === 'content' && typeof evt.data === 'string') append(evt.data);
-            if (evt.type === 'end') { ended = true; }
-            if (evt.type === 'error') throw new Error(evt.error?.message || 'Stream error');
+            // diagnostics: track per-message event sequence and a timeout
+            // store on window to persist across closures in this handler
+            const w: any = typeof window !== 'undefined' ? window : {};
+            w.__chatSeq = w.__chatSeq || {};
+            w.__chatTimers = w.__chatTimers || {};
+            if (!w.__chatSeq[aiMsgId]) w.__chatSeq[aiMsgId] = [];
+            w.__chatSeq[aiMsgId].push(evt.type);
+
+            if (evt.type === 'start') {
+              setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, isLoading: true, streaming: true } : m));
+              // start a 12s timeout to guard against stuck loading
+              if (!w.__chatTimers[aiMsgId]) {
+                w.__chatTimers[aiMsgId] = setTimeout(() => {
+                  console.warn('GeneralChat timeout without content/end', { seq: w.__chatSeq[aiMsgId] });
+                  setMessages(prev => prev.map(m => m.id === aiMsgId ? {
+                    ...m,
+                    isLoading: false,
+                    streaming: false,
+                    content: m.content && m.content.length > 0 ? m.content : 'Response timed out. Please try again.'
+                  } : m));
+                  delete w.__chatTimers[aiMsgId];
+                }, 12000);
+              }
+            }
+            if (evt.type === 'content' && typeof evt.data === 'string') {
+              // first chunk: flip off loading
+              if (w.__chatTimers[aiMsgId]) { clearTimeout(w.__chatTimers[aiMsgId]); delete w.__chatTimers[aiMsgId]; }
+              setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, isLoading: false } : m));
+              append(evt.data);
+            }
+            if (evt.type === 'metadata') {
+              // ensure we don’t keep spinner if provider only sends metadata
+              setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, isLoading: false } : m));
+            }
+            if (evt.type === 'end') {
+              ended = true;
+              if (w.__chatTimers[aiMsgId]) { clearTimeout(w.__chatTimers[aiMsgId]); delete w.__chatTimers[aiMsgId]; }
+              setMessages(prev => prev.map(m => m.id === aiMsgId ? {
+                ...m,
+                streaming: false,
+                isLoading: false,
+                content: m.content && m.content.length > 0 ? m.content : 'I couldn\'t generate a response this time. Please try again.'
+              } : m));
+              if (w.__chatSeq[aiMsgId] && !w.__chatSeq[aiMsgId].includes('content')) {
+                console.warn('GeneralChat ended without content', { seq: w.__chatSeq[aiMsgId] });
+              }
+              delete w.__chatSeq[aiMsgId];
+            }
+            if (evt.type === 'error') {
+              if (w.__chatTimers[aiMsgId]) { clearTimeout(w.__chatTimers[aiMsgId]); delete w.__chatTimers[aiMsgId]; }
+              throw new Error(evt.error?.message || 'Stream error');
+            }
           } catch {}
         }
       }
@@ -786,7 +835,14 @@ export default function GeneralChat({ className }: GeneralChatProps) {
                       aria-roledescription="chat message"
                     >
                       <div className="text-sm">
-                        <RichContent text={message.content} />
+                        {message.isLoading ? (
+                          <div className="text-muted-foreground flex items-center gap-2">
+                            <span className="inline-block h-3 w-3 rounded-full bg-muted-foreground/50 animate-pulse" />
+                            <span>Getting response...</span>
+                          </div>
+                        ) : (
+                          <RichContent text={message.content} />
+                        )}
                       </div>
 
                       {message.role === 'assistant' && (
