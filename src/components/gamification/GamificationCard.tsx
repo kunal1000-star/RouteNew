@@ -196,8 +196,8 @@ function useProgressCalculation(gamificationData: GamificationData | null) {
     const nextLevelXP = nextLevelInfo ? nextLevelInfo.xp : currentLevelXP + 100;
     
     const totalPoints = gamificationData.total_points_earned || 0;
-    const penaltyPoints = gamificationData.total_penalty_points || 0;
-    const netPoints = totalPoints - penaltyPoints;
+    const penaltyPoints = 0; // Temporarily disabled until schema is fixed
+    const netPoints = totalPoints;
     
     const xpIntoLevel = netPoints - currentLevelXP;
     const xpForLevel = nextLevelXP - currentLevelXP;

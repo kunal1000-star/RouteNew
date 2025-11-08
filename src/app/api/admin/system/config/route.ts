@@ -29,6 +29,8 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function OPTIONS() { return NextResponse.json({}, { status: 200 }); }
+
 // PUT /api/admin/system/config
 export async function PUT(request: NextRequest) {
   try {

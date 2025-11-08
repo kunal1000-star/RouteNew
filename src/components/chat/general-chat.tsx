@@ -22,6 +22,7 @@ import {
   X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import ProviderSelector from '@/components/chat/ProviderSelector';
 
 export function GeneralChat() {
   const {
@@ -54,6 +55,7 @@ export function GeneralChat() {
     characterCount,
     maxCharacters,
     isOverLimit,
+  , setSelectedProvider
   } = useChat();
 
   // Handle form submission
@@ -225,6 +227,15 @@ export function GeneralChat() {
                 </p>
               </div>
             </div>
+
+            {/* Provider selector + status */}
+            <div className="flex items-center gap-4">
+              <div className="hidden md:block min-w-[260px]">
+                <ProviderSelector
+                  value={(uiState as any).selectedProvider || 'groq'}
+                  onValueChange={(p) => setSelectedProvider(p as string)}
+                />
+              </div>
 
             {/* Connection status and rate limiting info */}
             <div className="flex items-center gap-2">

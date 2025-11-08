@@ -33,11 +33,14 @@ export interface CreateConversationRequest {
   chatType: 'general' | 'study_assistant';
 }
 
+import type { AIProvider } from '@/types/api-test';
+
 export interface SendMessageRequest {
   userId?: string; // Derived server-side from Supabase JWT
   conversationId: string;
   message: string;
   chatType: 'general' | 'study_assistant';
+  provider?: AIProvider;
 }
 
 export interface SendMessageResponse {
@@ -159,6 +162,9 @@ export interface ChatUIState {
   isSidebarOpen: boolean;
   retryCountdown: number;
   isFirstMessage: boolean;
+  // Optional in-memory selected provider for UI
+  // Not persisted; defaults to 'groq' in hook
+  
 }
 
 // Provider information types

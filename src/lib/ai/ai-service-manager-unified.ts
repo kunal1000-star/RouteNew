@@ -51,6 +51,43 @@ let DYNAMIC_FALLBACK_CHAINS: Record<QueryType, AIProvider[]> = {
 };
 
 export class AIServiceManager {
+  private async createClientForProvider(providerName: AIProvider, userId: string | null) {
+    const config = (ALL_PROVIDERS as any)[providerName];
+    if (config?.client) return config.client;
+
+    try {
+      switch (providerName) {
+        case 'groq':
+          config.client = createGroqClient(process.env.GROQ_API_KEY);
+          break;
+        case 'gemini':
+          config.client = createGeminiClient(process.env.GEMINI_API_KEY);
+          break;
+        case 'cerebras':
+          config.client = createCerebrasClient(process.env.CEREBRAS_API_KEY);
+          break;
+        case 'cohere':
+          config.client = createCohereClient(process.env.COHERE_API_KEY);
+          break;
+        case 'mistral':
+          config.client = createMistralClient(process.env.MISTRAL_API_KEY);
+          break;
+        case 'openrouter':
+          config.client = createOpenRouterClient(process.env.OPENROUTER_API_KEY);
+          break;
+        default:
+          throw new Error(`Unsupported provider: ${providerName}`);
+      }
+      return config.client;
+    } catch (err) {
+      // Mark provider as unhealthy when instantiation fails (likely missing API key)
+      if (config) {
+        config.healthy = false;
+        config.lastCheck = Date.now();
+      }
+      throw err instanceof Error ? err : new Error(String(err));
+    }
+  }
   private healthCheckInterval: number = 300000; // 5 minutes
   private lastHealthCheck: number = 0;
   private isCheckingHealth: boolean = false;

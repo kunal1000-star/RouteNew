@@ -29,12 +29,13 @@ export function useChat() {
     isCreatingConversation: false,
     isDeletingConversation: false,
   });
-  const [uiState, setUIState] = useState<ChatUIState>({
+  const [uiState, setUIState] = useState<ChatUIState & { selectedProvider?: any }>({
     selectedConversation: null,
     inputValue: '',
     isSidebarOpen: true,
     retryCountdown: 0,
     isFirstMessage: true,
+    selectedProvider: 'groq',
   });
   const [error, setError] = useState<ChatError | null>(null);
   const [rateLimitInfo, setRateLimitInfo] = useState<RateLimitInfo | null>(null);
@@ -249,11 +250,12 @@ export function useChat() {
       setMessages(prev => [...prev, loadingMessage]);
 
       // Send to backend
-      const request: SendMessageRequest = {
+      const request: SendMessageRequest & { provider?: any } = {
         // userId omitted; derived server-side
         conversationId: currentConversationId,
         message: message.trim(),
         chatType: 'general',
+  provider: (uiState as any).selectedProvider,
       };
 
       const result = await safeApiCall('/api/chat/general/send', {
@@ -447,6 +449,8 @@ export function useChat() {
     clearError,
     setInputValue,
     toggleSidebar,
+    setSelectedProvider: (provider: string) => setUIState(prev => ({ ...prev, selectedProvider: provider })),
+
     
     // Refs
     messagesEndRef,

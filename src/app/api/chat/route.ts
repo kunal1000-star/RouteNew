@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import type { AIProvider } from '@/types/api-test';
+import { createClient } from '@supabase/supabase-js';
 import type { ChatType } from '@/types/ai-service-manager';
 
 // Simple request/response interfaces for this route
@@ -224,8 +225,102 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET /api/chat - Get chat service health and capabilities
-export async function GET() {
+// GET /api/chat - Get chat service health and capabilities or conversations
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const action = searchParams.get('action');
+    const chatType = searchParams.get('chatType');
+
+    // Handle conversation listing requests
+    if (action === 'conversations' || (chatType && !searchParams.get('provider'))) {
+      return await handleConversationsRequest(request);
+    }
+
+    // Default: Get chat service health and capabilities
+    return await handleHealthCheckRequest();
+  } catch (error) {
+    console.error('Chat API GET error:', error);
+    
+    return NextResponse.json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'An unexpected error occurred',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      metadata: {
+        timestamp: new Date().toISOString(),
+      },
+    }, { status: 500 });
+  }
+}
+// Helper functions for conversation management
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function getDbForRequest(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.substring(7);
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { headers: { Authorization: `Bearer ${token}` } } }
+  );
+}
+
+// Handle conversation management requests
+async function handleConversationsRequest(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const chatType = searchParams.get('chatType');
+
+    // Get Supabase client for this request
+    const db = getDbForRequest(request);
+    if (!db) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get authenticated user
+    const { data: authData, error: authError } = await db.auth.getUser();
+    if (authError || !authData?.user) {
+      return NextResponse.json({ error: 'Unauthorized: invalid or missing token' }, { status: 401 });
+    }
+    const userId = authData.user.id;
+
+    if (!UUID_REGEX.test(userId)) {
+      return NextResponse.json({ error: 'Invalid authenticated user id: must be a UUID' }, { status: 400 });
+    }
+
+    let query = db
+      .from('chat_conversations')
+      .select('id, title, chat_type, created_at, updated_at, is_archived')
+      .eq('user_id', userId)
+      .eq('is_archived', false)
+      .order('updated_at', { ascending: false });
+
+    if (chatType) {
+      query = query.eq('chat_type', chatType);
+    }
+
+    const { data: conversations, error } = await query;
+
+    if (error) {
+      throw new Error(`Failed to fetch conversations: ${error.message}`);
+    }
+
+    return NextResponse.json({ conversations });
+  } catch (error) {
+    console.error('Get conversations error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// Handle health check requests
+async function handleHealthCheckRequest() {
   try {
     // Get chat service safely with fallback
     const { service: chatService, initialized } = await getChatServiceSafely();

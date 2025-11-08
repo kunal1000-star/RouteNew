@@ -102,6 +102,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { provid
   }
 }
 
+export async function OPTIONS() { return NextResponse.json({}, { status: 200 }); }
+
 // Helper functions
 function getProviderTier(provider: AIProvider): number {
   const tierMap: Record<AIProvider, number> = {

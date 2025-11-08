@@ -189,13 +189,15 @@ export async function safeApiCall(url: string, options?: RequestInit & { require
       headers
     };
 
-    console.log('🔗 Making API call to:', url);
+    const method = (fetchOptions.method || 'GET').toUpperCase();
+
+    console.log('🔗 Making API call to:', url, 'method:', method);
     const response = await fetch(url, fetchOptions);
 
     // Check if the response is HTML (e.g., an error page or login redirect)
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('text/html')) {
-      console.warn('⚠️ Received HTML response from:', url, 'Status:', response.status);
+      console.warn('⚠️ Received HTML response from:', url, 'Status:', response.status, 'method:', method, 'finalURL:', response.url);
       
       // If we get a 401 or redirect, it likely means auth failed
       if (response.status === 401 || response.status === 302) {
@@ -218,7 +220,11 @@ export async function safeApiCall(url: string, options?: RequestInit & { require
     // Handle HTTP errors
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ API call failed:', response.status, errorText);
+      const allow = response.headers.get('allow');
+      console.error('❌ API call failed:', response.status, errorText, {
+        request: { url, method, headers },
+        response: { url: response.url, status: response.status, statusText: response.statusText, allow }
+      });
       
       // If it's an auth error, provide specific feedback
       if (response.status === 401) {

@@ -151,7 +151,7 @@ export default function GeneralChat({ className }: GeneralChatProps) {
       setIsLoadingConversations(true);
       console.log('🔍 Loading conversations for user:', userId);
       
-      const result = await safeApiCall(`/api/chat/conversations?userId=${userId}&chatType=general`);
+      const result = await safeApiCall(`/api/chat?chatType=general`);
       
       if (result.isHtmlResponse) {
         console.warn('⚠️ HTML response detected for conversations:', result.error);

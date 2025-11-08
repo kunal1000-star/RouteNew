@@ -107,6 +107,8 @@ const DEFAULT_SETTINGS = {
 let currentSettings = { ...DEFAULT_SETTINGS };
 
 // GET /api/admin/embeddings/settings
+export async function OPTIONS() { return NextResponse.json({}, { status: 200 }); }
+
 export async function GET(request: NextRequest) {
   try {
     // Simulate data loading delay
