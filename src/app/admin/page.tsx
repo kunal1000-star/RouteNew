@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Settings,
@@ -18,7 +18,9 @@ import {
   Save,
   ArrowLeft,
   Bug,
-  ExternalLink
+  ExternalLink,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -86,6 +88,8 @@ export default function AdminPanel() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [testResults, setTestResults] = useState<any[]>([]);
+  // Scroll ref for desktop tabs container
+  const tabsScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadSystemData();
@@ -268,17 +272,66 @@ export default function AdminPanel() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-9 overflow-x-auto scrollbar-hide sticky top-16 z-10 bg-background/95 backdrop-blur px-2 py-1 md:py-2 shadow-sm">
-            <TabsTrigger value="overview" className="flex-shrink-0 text-xs">Overview</TabsTrigger>
-            <TabsTrigger value="debug" className="flex-shrink-0 text-xs">Debug</TabsTrigger>
-            <TabsTrigger value="providers" className="flex-shrink-0 text-xs">Providers</TabsTrigger>
-            <TabsTrigger value="model-overrides" className="flex-shrink-0 text-xs">Model Overrides</TabsTrigger>
-            <TabsTrigger value="fallback-chain" className="flex-shrink-0 text-xs">Fallback Chain</TabsTrigger>
-            <TabsTrigger value="chat-settings" className="flex-shrink-0 text-xs">Chat Settings</TabsTrigger>
-            <TabsTrigger value="config" className="flex-shrink-0 text-xs">Configuration</TabsTrigger>
-            <TabsTrigger value="monitoring" className="flex-shrink-0 text-xs">Monitoring</TabsTrigger>
-            <TabsTrigger value="embeddings" className="flex-shrink-0 text-xs">Embeddings</TabsTrigger>
-          </TabsList>
+          {/* Mobile: Dropdown selector for tabs */}
+<div className="md:hidden sticky top-16 z-20 bg-background/95 backdrop-blur px-2 py-2 shadow-sm">
+  <Select value={activeTab} onValueChange={setActiveTab}>
+    <SelectTrigger>
+      <SelectValue placeholder="Select section" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="overview">Overview</SelectItem>
+      <SelectItem value="debug">Debug</SelectItem>
+      <SelectItem value="providers">Providers</SelectItem>
+      <SelectItem value="model-overrides">Model Overrides</SelectItem>
+      <SelectItem value="fallback-chain">Fallback Chain</SelectItem>
+      <SelectItem value="chat-settings">Chat Settings</SelectItem>
+      <SelectItem value="config">Configuration</SelectItem>
+      <SelectItem value="monitoring">Monitoring</SelectItem>
+      <SelectItem value="embeddings">Embeddings</SelectItem>
+    </SelectContent>
+  </Select>
+</div>
+
+{/* Desktop: Tabs list with scroll controls */}
+<div className="hidden md:block sticky top-16 z-30 bg-background/95 backdrop-blur py-1 shadow-sm">
+  <div className="relative">
+    <button
+      type="button"
+      onClick={() => tabsScrollRef.current?.scrollBy({ left: -240, behavior: 'smooth' })}
+      className="absolute left-0 top-1/2 -translate-y-1/2 z-40 h-8 w-8 rounded-full bg-background/90 border shadow flex items-center justify-center hover:bg-accent"
+      aria-label="Scroll tabs left"
+    >
+      <ChevronLeft className="h-4 w-4" />
+    </button>
+
+    <div ref={tabsScrollRef} className="overflow-x-auto scrollbar-hide px-10">
+      <TabsList className="flex w-max gap-2 px-0">
+        <TabsTrigger value="overview" className="flex-shrink-0 text-xs">Overview</TabsTrigger>
+        <TabsTrigger value="debug" className="flex-shrink-0 text-xs">Debug</TabsTrigger>
+        <TabsTrigger value="providers" className="flex-shrink-0 text-xs">Providers</TabsTrigger>
+        <TabsTrigger value="model-overrides" className="flex-shrink-0 text-xs">Model Overrides</TabsTrigger>
+        <TabsTrigger value="fallback-chain" className="flex-shrink-0 text-xs">Fallback Chain</TabsTrigger>
+        <TabsTrigger value="chat-settings" className="flex-shrink-0 text-xs">Chat Settings</TabsTrigger>
+        <TabsTrigger value="config" className="flex-shrink-0 text-xs">Configuration</TabsTrigger>
+        <TabsTrigger value="monitoring" className="flex-shrink-0 text-xs">Monitoring</TabsTrigger>
+        <TabsTrigger value="embeddings" className="flex-shrink-0 text-xs">Embeddings</TabsTrigger>
+      </TabsList>
+    </div>
+
+    <button
+      type="button"
+      onClick={() => tabsScrollRef.current?.scrollBy({ left: 240, behavior: 'smooth' })}
+      className="absolute right-0 top-1/2 -translate-y-1/2 z-40 h-8 w-8 rounded-full bg-background/90 border shadow flex items-center justify-center hover:bg-accent"
+      aria-label="Scroll tabs right"
+    >
+      <ChevronRight className="h-4 w-4" />
+    </button>
+
+    {/* Edge gradients */}
+    <div className="pointer-events-none absolute left-0 top-0 h-full w-8 bg-gradient-to-r from-background to-transparent" />
+    <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-background to-transparent" />
+  </div>
+</div>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">

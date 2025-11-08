@@ -15,6 +15,8 @@ import { cohereClient } from '@/lib/ai/providers/cohere-client';
 import { mistralClient } from '@/lib/ai/providers/mistral-client';
 import { openRouterClient } from '@/lib/ai/providers/openrouter-client';
 
+const DEBUG_TEST_USER_ID = '00000000-0000-0000-0000-000000000001';
+
 interface DebugTestRequest {
   testType: 'providers' | 'database' | 'centralized_service' | 'chat_flow' | 'features' | 'performance' | 'all';
   userId?: string;
@@ -147,7 +149,7 @@ async function testDatabaseConnections(): Promise<DebugTestResult[]> {
   // Test basic database query
   const startTime = Date.now();
   try {
-    const testProfile = await aiDataService.getAIUserProfile('test-user-123');
+    const testProfile = await aiDataService.getAIUserProfile(DEBUG_TEST_USER_ID);
     results.push({
       testName: 'Database Connection',
       success: true,
@@ -171,7 +173,7 @@ async function testDatabaseConnections(): Promise<DebugTestResult[]> {
 
 async function testCentralizedDataService(userId?: string): Promise<DebugTestResult[]> {
   const results: DebugTestResult[] = [];
-  const testUserId = userId || 'test-user-123';
+  const testUserId = userId || DEBUG_TEST_USER_ID;
 
   // Test AI user profile
   const startTime1 = Date.now();
@@ -220,7 +222,7 @@ async function testCentralizedDataService(userId?: string): Promise<DebugTestRes
 
 async function testChatFlow(userId?: string, testMessage?: string): Promise<DebugTestResult[]> {
   const results: DebugTestResult[] = [];
-  const testUserId = userId || 'test-user-123';
+  const testUserId = userId || DEBUG_TEST_USER_ID;
   const message = testMessage || 'Hello, this is a test message for debugging the AI system.';
 
   // Test AI Service Manager
@@ -261,7 +263,7 @@ async function testChatFlow(userId?: string, testMessage?: string): Promise<Debu
 
 async function testAIFeaturesEngine(userId?: string): Promise<DebugTestResult[]> {
   const results: DebugTestResult[] = [];
-  const testUserId = userId || 'test-user-123';
+  const testUserId = userId || DEBUG_TEST_USER_ID;
 
   // Test features engine status
   const startTime = Date.now();

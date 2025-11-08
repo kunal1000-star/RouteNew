@@ -1,5 +1,5 @@
 
-'use server';
+'use client';
 
 import { supabaseBrowserClient } from '@/lib/supabase';
 import { calculateLevel } from './levels';
@@ -16,7 +16,12 @@ type PointsHistoryInsert = Database['public']['Tables']['points_history']['Inser
  * @param userId - The ID of the user to initialize.
  * @returns The newly created gamification data and any potential error.
  */
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export async function initializeUserGamification(userId: string) {
+  if (!userId || !UUID_REGEX.test(userId)) {
+    return { data: null, error: new Error('Invalid user id: must be a UUID') as any } as any;
+  }
   const { data, error } = await supabaseBrowserClient
     .from('user_gamification')
     .insert({
@@ -41,24 +46,39 @@ export async function initializeUserGamification(userId: string) {
  * @returns The user's gamification data.
  */
 export async function getUserGamification(userId: string) {
-  let { data, error } = await supabaseBrowserClient
-    .from('user_gamification')
-    .select('*')
-    .eq('user_id', userId)
-    .single();
-
-  if (error && error.code === 'PGRST116') { // Not found
-      console.log(`[Gamification] No profile found for ${userId}, initializing...`);
-      const { data: newData, error: initError } = await initializeUserGamification(userId);
-      if (initError) {
-          console.error('[Gamification] Failed to initialize profile:', initError);
-          return { data: null, error: initError };
-      }
-      data = newData;
-      error = null;
+  // Validate input early to avoid confusing downstream errors
+  if (!userId || !UUID_REGEX.test(userId)) {
+    const err = new Error('Invalid user id: must be a UUID');
+    console.error('[Gamification] getUserGamification called with invalid userId');
+    return { data: null, error: err as any } as any;
   }
-  
-  return { data, error };
+
+  try {
+    const { data, error } = await supabaseBrowserClient
+      .from('user_gamification')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        console.log(`[Gamification] No profile found for ${userId}, initializing...`);
+        const { data: newData, error: initError } = await initializeUserGamification(userId);
+        if (initError) {
+          console.error('[Gamification] Failed to initialize profile:', initError?.message || initError);
+          return { data: null, error: initError } as any;
+        }
+        return { data: newData, error: null } as any;
+      }
+      console.error('[Gamification] Unexpected error fetching profile:', error?.message || error);
+      return { data: null, error } as any;
+    }
+
+    return { data, error: null } as any;
+  } catch (e: any) {
+    console.error('[Gamification] Exception during getUserGamification:', e?.message || e);
+    return { data: null, error: e } as any;
+  }
 }
 
 /**

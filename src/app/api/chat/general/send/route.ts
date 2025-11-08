@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import type { Database } from '@/lib/database.types';
 
 function getDbForRequest(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
@@ -14,7 +15,6 @@ function getDbForRequest(request: NextRequest) {
     { global: { headers: { Authorization: `Bearer ${token}` } } }
   );
 }
-import type { Database } from '@/lib/database.types';
 
 // Graceful AI service manager initialization
 async function getAiServiceManagerSafely() {
@@ -78,16 +78,23 @@ export async function POST(request: NextRequest) {
     }
     const userId = authData.user.id;
 
+    // Strict UUID validation (no fallback)
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(userId)) {
+      return NextResponse.json({ error: 'Invalid authenticated user id: must be a UUID' }, { status: 400 });
+    }
+    const effectiveUserId = userId;
+
     // Rate limiting per-user per-provider
     const provider = (requestBody?.provider || 'openrouter') as string;
     const { shouldAllow } = await import('@/lib/ai/rate-limit-manager');
-    const rl = await shouldAllow(userId, provider);
+    const rl = await shouldAllow(effectiveUserId, provider);
     if (!rl.allow) {
       return NextResponse.json({ error: 'Rate limit exceeded', retryAfter: rl.retryAfter }, { status: 429 });
     }
 
     // Additional logging for debugging
-    console.log('UserId (derived):', userId);
+    console.log('UserId (derived):', effectiveUserId);
     console.log('ConversationId:', conversationId);
     console.log('Message:', message);
     console.log('ChatType:', chatType);
@@ -99,7 +106,7 @@ export async function POST(request: NextRequest) {
       const { data: newConversation, error } = await db
         .from('chat_conversations')
         .insert({
-          user_id: userId,
+          user_id: effectiveUserId,
           title: message.substring(0, 50) + (message.length > 50 ? '...' : ''),
           chat_type: chatType,
         })
@@ -119,7 +126,7 @@ export async function POST(request: NextRequest) {
         .select('id, user_id')
         .eq('id', finalConversationId)
         .single();
-      if (convErr || !conv || conv.user_id !== userId) {
+      if (convErr || !conv || conv.user_id !== effectiveUserId) {
         return NextResponse.json({ error: 'Forbidden: conversation does not belong to user' }, { status: 403 });
       }
     }
@@ -151,7 +158,7 @@ export async function POST(request: NextRequest) {
       try {
         // Call AI Service Manager
         aiResponse = await aiServiceManager.processQuery({
-          userId,
+          userId: effectiveUserId,
           conversationId: finalConversationId,
           message,
           chatType,

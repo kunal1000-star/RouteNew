@@ -1,5 +1,5 @@
 
-'use server';
+'use client';
 
 import { supabaseBrowserClient } from '@/lib/supabase';
 import { isToday, isYesterday, isBefore, startOfDay } from 'date-fns';

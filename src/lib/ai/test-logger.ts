@@ -1,5 +1,5 @@
 
-'use server';
+'use client';
 
 import { supabaseBrowserClient } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
