@@ -1,0 +1,824 @@
+// Layer 4: PersonalizationEngine - Main Implementation
+// ======================================================
+
+import { Database } from '@/lib/database.types';
+import { logError, logWarning, logInfo } from '@/lib/error-logger';
+
+// Core interfaces
+export interface LearningStyle {
+  type: 'visual' | 'auditory' | 'kinesthetic' | 'reading_writing';
+  strength: number; // 0-1 scale
+  preferences: {
+    contentFormats: string[];
+    interactionTypes: string[];
+    difficultyProgression: 'gradual' | 'steep' | 'mixed';
+    feedbackFrequency: 'immediate' | 'session_end' | 'periodic';
+  };
+  adaptationHistory: {
+    adaptations: number;
+    successfulChanges: number;
+    lastAdaptation: Date;
+  };
+}
+
+export interface PersonalizationProfile {
+  userId: string;
+  learningStyle: LearningStyle;
+  performanceMetrics: {
+    overallAccuracy: number;
+    subjectPerformance: Record<string, {
+      accuracy: number;
+      speed: number;
+      improvement: number;
+      lastActivity: Date;
+    }>;
+    sessionPatterns: {
+      averageSessionLength: number;
+      peakLearningHours: string[];
+      preferredSessionLength: number;
+      breakFrequency: number;
+    };
+  };
+  adaptationHistory: {
+    lastAdaptation: Date;
+    adaptationCount: number;
+    successfulAdaptations: number;
+    adaptationTypes: Array<{
+      type: string;
+      date: Date;
+      success: number; // 0-1 scale
+      impact: string;
+    }>;
+  };
+  preferences: {
+    responseStyle: 'concise' | 'detailed' | 'step_by_step' | 'interactive';
+    explanationDepth: 'basic' | 'intermediate' | 'advanced';
+    examplePreference: 'abstract' | 'concrete' | 'real_world';
+    interactionPreference: 'socratic' | 'direct' | 'collaborative';
+  };
+  effectivePatterns: {
+    successfulStrategies: string[];
+    learningTriggers: string[];
+    motivationFactors: string[];
+    studyMethods: Array<{
+      method: string;
+      effectiveness: number;
+      context: string;
+    }>;
+  };
+}
+
+export interface PersonalizationRequest {
+  userId: string;
+  context: any;
+  target: any;
+  constraints?: any;
+  priority?: string;
+  maxProcessingTime?: number;
+  requireValidation?: boolean;
+  sessionHistory?: Array<{
+    query: string;
+    response: string;
+    timestamp: Date;
+    performance?: {
+      responseTime: number;
+      accuracy: number;
+      engagement: number;
+      satisfaction: number;
+    };
+  }>;
+  currentProfile?: PersonalizationProfile;
+}
+
+export interface PersonalizationResult {
+  userProfile: PersonalizationProfile;
+  personalization: any;
+  adaptations: Array<{
+    type: string;
+    change: any;
+    rationale: string;
+  }>;
+  confidence: number;
+  validation: {
+    isValid: boolean;
+    issues?: string[];
+  };
+  processingTime: number;
+}
+
+export class PersonalizationEngine {
+  private db: Database;
+  private adaptationWeights = {
+    learningStyle: 0.3,
+    performance: 0.25,
+    sessionPatterns: 0.2,
+    effectiveStrategies: 0.15,
+    feedbackHistory: 0.1
+  };
+
+  constructor(db?: Database) {
+    this.db = db!;
+  }
+
+  /**
+   * Main personalization method
+   */
+  async personalize(request: PersonalizationRequest): Promise<PersonalizationResult> {
+    const startTime = Date.now();
+    
+    try {
+      logInfo('Personalization started', {
+        componentName: 'PersonalizationEngine',
+        userId: request.userId,
+        requestType: 'personalize'
+      });
+
+      // Get or create profile
+      const profile = await this.getOrCreateProfile(request.userId, request.currentProfile);
+
+      // Build enhanced context
+      const context = this.buildEnhancedContext(request.context);
+
+      // Generate personalization
+      const personalization = await this.generatePersonalization(profile, context);
+
+      // Create adaptations
+      const adaptations = this.createAdaptations(profile, context);
+
+      // Validate results
+      const validation = this.validateResults(personalization, adaptations);
+
+      // Update profile
+      await this.updateProfile(profile, personalization, adaptations);
+
+      const processingTime = Date.now() - startTime;
+
+      const result: PersonalizationResult = {
+        userProfile: profile,
+        personalization,
+        adaptations,
+        confidence: this.calculateConfidence(personalization, adaptations, profile),
+        validation,
+        processingTime
+      };
+
+      logInfo('Personalization completed', {
+        componentName: 'PersonalizationEngine',
+        userId: request.userId,
+        confidence: result.confidence,
+        processingTime
+      });
+
+      return result;
+
+    } catch (error) {
+      logError(error instanceof Error ? error : new Error(String(error)), {
+        componentName: 'PersonalizationEngine',
+        operation: 'personalize',
+        userId: request.userId
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Personalize specific response
+   */
+  async personalizeResponse(
+    userId: string,
+    response: string,
+    context: any,
+    userProfile?: PersonalizationProfile
+  ): Promise<{ personalizedResponse: string; confidence: number; adaptations: string[] }> {
+    try {
+      const profile = await this.getOrCreateProfile(userId, userProfile);
+      const enhancedContext = this.buildEnhancedContext(context);
+
+      const adaptations = this.identifyResponseAdaptations(response, profile, enhancedContext);
+      const personalizedResponse = this.applyResponseAdaptations(response, adaptations);
+
+      return {
+        personalizedResponse,
+        confidence: this.calculateAdaptationConfidence(adaptations, profile),
+        adaptations: adaptations.map(a => a.description)
+      };
+    } catch (error) {
+      logError(error instanceof Error ? error : new Error(String(error)), {
+        componentName: 'PersonalizationEngine',
+        operation: 'personalizeResponse',
+        userId
+      });
+      
+      return {
+        personalizedResponse: response,
+        confidence: 0,
+        adaptations: []
+      };
+    }
+  }
+
+  /**
+   * Build user profile
+   */
+  async buildUserProfile(userId: string, interactionData: any[]): Promise<PersonalizationProfile> {
+    try {
+      const profile = await this.getOrCreateProfile(userId);
+      
+      // Analyze interaction data to build profile
+      const analysis = this.analyzeInteractionData(interactionData);
+      
+      // Update profile based on analysis
+      profile.learningStyle = this.inferLearningStyle(analysis);
+      profile.performanceMetrics = this.updatePerformanceMetrics(profile, analysis);
+      profile.effectivePatterns = this.updateEffectivePatterns(profile, analysis);
+
+      // Save updated profile
+      await this.saveProfile(profile);
+
+      return profile;
+    } catch (error) {
+      logError(error instanceof Error ? error : new Error(String(error)), {
+        componentName: 'PersonalizationEngine',
+        operation: 'buildUserProfile',
+        userId
+      });
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Update user profile
+   */
+  async updateUserProfile(
+    userId: string,
+    updates: Partial<PersonalizationProfile>
+  ): Promise<PersonalizationProfile> {
+    try {
+      const profile = await this.getOrCreateProfile(userId);
+      
+      // Merge updates
+      const updatedProfile = { ...profile, ...updates };
+      
+      // Validate updates
+      this.validateProfileUpdates(updatedProfile);
+      
+      // Save updated profile
+      await this.saveProfile(updatedProfile);
+      
+      return updatedProfile;
+    } catch (error) {
+      logError(error instanceof Error ? error : new Error(String(error)), {
+        componentName: 'PersonalizationEngine',
+        operation: 'updateUserProfile',
+        userId
+      });
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Track learning progress
+   */
+  async trackLearningProgress(
+    userId: string,
+    sessionData: {
+      query: string;
+      response: string;
+      performance: {
+        responseTime: number;
+        accuracy: number;
+        engagement: number;
+        satisfaction: number;
+      };
+      timestamp: Date;
+    }
+  ): Promise<{
+    progressMetrics: any;
+    recommendations: string[];
+    nextSessionSuggestions: string[];
+  }> {
+    try {
+      const profile = await this.getOrCreateProfile(userId);
+      
+      // Update performance metrics
+      this.updatePerformanceWithSession(profile, sessionData);
+      
+      // Analyze progress
+      const progressMetrics = this.calculateProgressMetrics(profile, sessionData);
+      
+      // Generate recommendations
+      const recommendations = this.generateLearningRecommendations(profile, progressMetrics);
+      
+      // Generate next session suggestions
+      const nextSessionSuggestions = this.generateNextSessionSuggestions(profile, progressMetrics);
+      
+      // Save updated profile
+      await this.saveProfile(profile);
+      
+      return {
+        progressMetrics,
+        recommendations,
+        nextSessionSuggestions
+      };
+    } catch (error) {
+      logError(error instanceof Error ? error : new Error(String(error)), {
+        componentName: 'PersonalizationEngine',
+        operation: 'trackLearningProgress',
+        userId
+      });
+      
+      throw error;
+    }
+  }
+
+  // Private helper methods
+
+  private async getOrCreateProfile(userId: string, existingProfile?: PersonalizationProfile): Promise<PersonalizationProfile> {
+    if (existingProfile) {
+      return existingProfile;
+    }
+
+    try {
+      // Try to load from database
+      const { data: existingData } = await this.db
+        .from('personalization_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (existingData) {
+        return this.mapDatabaseProfileToInterface(existingData);
+      }
+    } catch (error) {
+      logWarning('Could not load profile from database', {
+        componentName: 'PersonalizationEngine',
+        userId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+
+    // Create new profile
+    return this.createInitialProfile(userId);
+  }
+
+  private createInitialProfile(userId: string): PersonalizationProfile {
+    return {
+      userId,
+      learningStyle: {
+        type: 'reading_writing',
+        strength: 0.5,
+        preferences: {
+          contentFormats: ['text', 'explanation'],
+          interactionTypes: ['chat', 'questions'],
+          difficultyProgression: 'gradual',
+          feedbackFrequency: 'session_end'
+        },
+        adaptationHistory: {
+          adaptations: 0,
+          successfulChanges: 0,
+          lastAdaptation: new Date()
+        }
+      },
+      performanceMetrics: {
+        overallAccuracy: 0.7,
+        subjectPerformance: {},
+        sessionPatterns: {
+          averageSessionLength: 15,
+          peakLearningHours: ['14:00', '15:00', '16:00'],
+          preferredSessionLength: 20,
+          breakFrequency: 0.3
+        }
+      },
+      adaptationHistory: {
+        lastAdaptation: new Date(),
+        adaptationCount: 0,
+        successfulAdaptations: 0,
+        adaptationTypes: []
+      },
+      preferences: {
+        responseStyle: 'detailed',
+        explanationDepth: 'intermediate',
+        examplePreference: 'concrete',
+        interactionPreference: 'collaborative'
+      },
+      effectivePatterns: {
+        successfulStrategies: [],
+        learningTriggers: [],
+        motivationFactors: [],
+        studyMethods: []
+      }
+    };
+  }
+
+  private buildEnhancedContext(context: any): any {
+    return {
+      ...context,
+      timestamp: new Date(),
+      sessionId: context.sessionId || 'unknown',
+      interactionCount: context.interactionCount || 1
+    };
+  }
+
+  private async generatePersonalization(profile: PersonalizationProfile, context: any): Promise<any> {
+    return {
+      responseStyle: profile.preferences.responseStyle,
+      explanationDepth: profile.preferences.explanationDepth,
+      learningStyle: profile.learningStyle.type,
+      adaptations: this.getStyleAdaptations(profile.learningStyle),
+      recommendedContent: this.getRecommendedContent(profile),
+      interactionStyle: profile.preferences.interactionPreference
+    };
+  }
+
+  private createAdaptations(profile: PersonalizationProfile, context: any): Array<{
+    type: string;
+    change: any;
+    rationale: string;
+  }> {
+    const adaptations = [];
+
+    // Learning style adaptation
+    adaptations.push({
+      type: 'learning_style',
+      change: { preferredFormat: profile.learningStyle.type },
+      rationale: `Based on detected ${profile.learningStyle.type} learning style`
+    });
+
+    // Performance-based adaptation
+    if (profile.performanceMetrics.overallAccuracy < 0.6) {
+      adaptations.push({
+        type: 'difficulty_adjustment',
+        change: { difficulty: 'decrease' },
+        rationale: 'Performance suggests lower difficulty needed'
+      });
+    }
+
+    return adaptations;
+  }
+
+  private validateResults(personalization: any, adaptations: any[]): { isValid: boolean; issues?: string[] } {
+    const issues = [];
+
+    if (!personalization.responseStyle) {
+      issues.push('Missing response style');
+    }
+
+    if (!personalization.explanationDepth) {
+      issues.push('Missing explanation depth');
+    }
+
+    return {
+      isValid: issues.length === 0,
+      issues: issues.length > 0 ? issues : undefined
+    };
+  }
+
+  private async updateProfile(profile: PersonalizationProfile, personalization: any, adaptations: any[]): Promise<void> {
+    profile.adaptationHistory.lastAdaptation = new Date();
+    profile.adaptationHistory.adaptationCount++;
+
+    if (adaptations.length > 0) {
+      profile.adaptationHistory.successfulAdaptations++;
+      profile.adaptationHistory.adaptationTypes.push({
+        type: adaptations[0].type,
+        date: new Date(),
+        success: 0.8, // Assume successful for now
+        impact: 'session_based'
+      });
+    }
+
+    await this.saveProfile(profile);
+  }
+
+  private calculateConfidence(personalization: any, adaptations: any[], profile: PersonalizationProfile): number {
+    let confidence = 0.5; // Base confidence
+
+    // Increase confidence based on adaptation quality
+    confidence += Math.min(adaptations.length * 0.1, 0.3);
+
+    // Increase confidence based on profile completeness
+    if (profile.effectivePatterns.successfulStrategies.length > 0) {
+      confidence += 0.1;
+    }
+
+    // Increase confidence based on learning style strength
+    confidence += profile.learningStyle.strength * 0.1;
+
+    return Math.min(1.0, confidence);
+  }
+
+  private identifyResponseAdaptations(response: string, profile: PersonalizationProfile, context: any) {
+    const adaptations = [];
+
+    // Format adaptation based on learning style
+    if (profile.learningStyle.type === 'visual' && !response.includes('diagram') && !response.includes('image')) {
+      adaptations.push({
+        type: 'format',
+        change: 'add_visual_indicators',
+        description: 'Add visual formatting for visual learners'
+      });
+    }
+
+    // Content adaptation based on preferences
+    if (profile.preferences.explanationDepth === 'basic' && response.length > 500) {
+      adaptations.push({
+        type: 'content',
+        change: 'simplify_language',
+        description: 'Simplify language for basic level preference'
+      });
+    }
+
+    return adaptations;
+  }
+
+  private applyResponseAdaptations(response: string, adaptations: any[]): string {
+    let adaptedResponse = response;
+
+    for (const adaptation of adaptations) {
+      switch (adaptation.change) {
+        case 'add_visual_indicators':
+          adaptedResponse = this.addVisualIndicators(adaptedResponse);
+          break;
+        case 'simplify_language':
+          adaptedResponse = this.simplifyLanguage(adaptedResponse);
+          break;
+      }
+    }
+
+    return adaptedResponse;
+  }
+
+  private calculateAdaptationConfidence(adaptations: any[], profile: PersonalizationProfile): number {
+    if (adaptations.length === 0) return 0.5;
+    return Math.min(0.9, 0.5 + (adaptations.length * 0.1));
+  }
+
+  private addVisualIndicators(response: string): string {
+    // Simple implementation - add formatting for key points
+    return response.replace(/\*\*(.*?)\*\*/g, '📌 **$1**')
+                   .replace(/#{1,3}\s+(.*)/g, '🔸 $1');
+  }
+
+  private simplifyLanguage(response: string): string {
+    // Simple implementation - replace complex words
+    return response.replace(/utilize/gi, 'use')
+                   .replace(/facilitate/gi, 'help')
+                   .replace(/commence/gi, 'start');
+  }
+
+  private analyzeInteractionData(interactionData: any[]): any {
+    return {
+      totalInteractions: interactionData.length,
+      averageResponseTime: interactionData.reduce((sum, d) => sum + (d.responseTime || 0), 0) / interactionData.length,
+      commonTopics: this.extractCommonTopics(interactionData),
+      engagementPatterns: this.analyzeEngagementPatterns(interactionData)
+    };
+  }
+
+  private extractCommonTopics(data: any[]): string[] {
+    // Simple topic extraction
+    const topics: string[] = [];
+    data.forEach(d => {
+      if (d.query) {
+        const words = d.query.toLowerCase().split(' ');
+        topics.push(...words.slice(0, 3));
+      }
+    });
+    
+    // Return most common topics (simplified)
+    return [...new Set(topics)].slice(0, 5);
+  }
+
+  private analyzeEngagementPatterns(data: any[]): any {
+    return {
+      averageEngagement: data.reduce((sum, d) => sum + (d.engagement || 0), 0) / data.length,
+      highEngagementCount: data.filter(d => (d.engagement || 0) > 0.7).length
+    };
+  }
+
+  private inferLearningStyle(analysis: any): LearningStyle {
+    // Simple learning style inference based on interaction patterns
+    const engagement = analysis.averageEngagement || 0.5;
+    
+    if (engagement > 0.7) {
+      return {
+        type: 'kinesthetic',
+        strength: 0.8,
+        preferences: {
+          contentFormats: ['interactive', 'hands_on'],
+          interactionTypes: ['practical', 'active'],
+          difficultyProgression: 'gradual',
+          feedbackFrequency: 'immediate'
+        },
+        adaptationHistory: {
+          adaptations: 0,
+          successfulChanges: 0,
+          lastAdaptation: new Date()
+        }
+      };
+    }
+    
+    return {
+      type: 'reading_writing',
+      strength: 0.6,
+      preferences: {
+        contentFormats: ['text', 'explanation'],
+        interactionTypes: ['chat', 'questions'],
+        difficultyProgression: 'gradual',
+        feedbackFrequency: 'session_end'
+      },
+      adaptationHistory: {
+        adaptations: 0,
+        successfulChanges: 0,
+        lastAdaptation: new Date()
+      }
+    };
+  }
+
+  private updatePerformanceMetrics(profile: PersonalizationProfile, analysis: any): PersonalizationProfile['performanceMetrics'] {
+    return {
+      ...profile.performanceMetrics,
+      overallAccuracy: Math.min(1, (profile.performanceMetrics.overallAccuracy + (analysis.averageEngagement || 0.5)) / 2)
+    };
+  }
+
+  private updateEffectivePatterns(profile: PersonalizationProfile, analysis: any): PersonalizationProfile['effectivePatterns'] {
+    return {
+      ...profile.effectivePatterns,
+      successfulStrategies: analysis.commonTopics || []
+    };
+  }
+
+  private async saveProfile(profile: PersonalizationProfile): Promise<void> {
+    try {
+      if (this.db) {
+        await this.db
+          .from('personalization_profiles')
+          .upsert({
+            user_id: profile.userId,
+            learning_style_type: profile.learningStyle.type,
+            learning_style_strength: profile.learningStyle.strength,
+            overall_accuracy: profile.performanceMetrics.overallAccuracy,
+            updated_at: new Date().toISOString()
+          });
+      }
+    } catch (error) {
+      logWarning('Could not save profile to database', {
+        componentName: 'PersonalizationEngine',
+        userId: profile.userId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  private validateProfileUpdates(profile: PersonalizationProfile): void {
+    if (!profile.userId) {
+      throw new Error('User ID is required');
+    }
+    
+    if (profile.learningStyle.strength < 0 || profile.learningStyle.strength > 1) {
+      throw new Error('Learning style strength must be between 0 and 1');
+    }
+  }
+
+  private updatePerformanceWithSession(profile: PersonalizationProfile, sessionData: any): void {
+    const currentAccuracy = profile.performanceMetrics.overallAccuracy;
+    const sessionAccuracy = sessionData.performance.accuracy;
+    
+    profile.performanceMetrics.overallAccuracy = (currentAccuracy + sessionAccuracy) / 2;
+  }
+
+  private calculateProgressMetrics(profile: PersonalizationProfile, sessionData: any): any {
+    return {
+      accuracyTrend: sessionData.performance.accuracy > profile.performanceMetrics.overallAccuracy ? 'improving' : 'stable',
+      engagementLevel: sessionData.performance.engagement,
+      responseTime: sessionData.performance.responseTime,
+      sessionSatisfaction: sessionData.performance.satisfaction
+    };
+  }
+
+  private generateLearningRecommendations(profile: PersonalizationProfile, progressMetrics: any): string[] {
+    const recommendations = [];
+    
+    if (progressMetrics.accuracyTrend === 'improving') {
+      recommendations.push('Great progress! Consider increasing difficulty slightly.');
+    }
+    
+    if (progressMetrics.engagementLevel < 0.5) {
+      recommendations.push('Try more interactive content to increase engagement.');
+    }
+    
+    return recommendations;
+  }
+
+  private generateNextSessionSuggestions(profile: PersonalizationProfile, progressMetrics: any): string[] {
+    const suggestions = [];
+    
+    suggestions.push(`Continue with ${profile.learningStyle.type} learning materials.`);
+    
+    if (profile.learningStyle.strength < 0.7) {
+      suggestions.push('Experiment with different learning formats.');
+    }
+    
+    return suggestions;
+  }
+
+  private getStyleAdaptations(learningStyle: LearningStyle): string[] {
+    switch (learningStyle.type) {
+      case 'visual':
+        return ['diagrams', 'charts', 'color_coding'];
+      case 'auditory':
+        return ['verbal_explanations', 'discussions'];
+      case 'kinesthetic':
+        return ['hands_on', 'practical_examples'];
+      default:
+        return ['text_based', 'written_summaries'];
+    }
+  }
+
+  private getRecommendedContent(profile: PersonalizationProfile): string[] {
+    const content = [];
+    
+    if (profile.preferences.examplePreference === 'concrete') {
+      content.push('real_world_examples');
+    }
+    
+    if (profile.preferences.interactionPreference === 'socratic') {
+      content.push('question_based_learning');
+    }
+    
+    return content;
+  }
+
+  private mapDatabaseProfileToInterface(dbData: any): PersonalizationProfile {
+    return {
+      userId: dbData.user_id,
+      learningStyle: {
+        type: dbData.learning_style_type || 'reading_writing',
+        strength: dbData.learning_style_strength || 0.5,
+        preferences: {
+          contentFormats: ['text', 'explanation'],
+          interactionTypes: ['chat', 'questions'],
+          difficultyProgression: 'gradual',
+          feedbackFrequency: 'session_end'
+        },
+        adaptationHistory: {
+          adaptations: 0,
+          successfulChanges: 0,
+          lastAdaptation: new Date()
+        }
+      },
+      performanceMetrics: {
+        overallAccuracy: dbData.overall_accuracy || 0.7,
+        subjectPerformance: {},
+        sessionPatterns: {
+          averageSessionLength: 15,
+          peakLearningHours: ['14:00', '15:00', '16:00'],
+          preferredSessionLength: 20,
+          breakFrequency: 0.3
+        }
+      },
+      adaptationHistory: {
+        lastAdaptation: new Date(),
+        adaptationCount: 0,
+        successfulAdaptations: 0,
+        adaptationTypes: []
+      },
+      preferences: {
+        responseStyle: 'detailed',
+        explanationDepth: 'intermediate',
+        examplePreference: 'concrete',
+        interactionPreference: 'collaborative'
+      },
+      effectivePatterns: {
+        successfulStrategies: [],
+        learningTriggers: [],
+        motivationFactors: [],
+        studyMethods: []
+      }
+    };
+  }
+}
+
+// Export singleton instance
+export const personalizationEngine = new PersonalizationEngine();
+
+// Export convenience functions
+export const personalizeResponse = (
+  userId: string,
+  response: string,
+  context: any,
+  userProfile?: PersonalizationProfile
+) => personalizationEngine.personalizeResponse(userId, response, context, userProfile);
+
+export const buildUserProfile = (userId: string, interactionData: any[]) =>
+  personalizationEngine.buildUserProfile(userId, interactionData);
+
+export const updateUserProfile = (userId: string, updates: Partial<PersonalizationProfile>) =>
+  personalizationEngine.updateUserProfile(userId, updates);
+
+export const trackLearningProgress = (userId: string, sessionData: any) =>
+  personalizationEngine.trackLearningProgress(userId, sessionData);

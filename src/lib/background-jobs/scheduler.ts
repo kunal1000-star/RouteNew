@@ -2,7 +2,7 @@
 // ======================================
 
 import cron, { ScheduledTask } from 'node-cron';
-import { aiServiceManager } from '../ai/ai-service-manager';
+import { aiServiceManager } from '../ai/ai-service-manager-unified';
 import { rateLimitTracker } from '../ai/rate-limit-tracker';
 import { responseCache } from '../ai/response-cache';
 
@@ -102,7 +102,6 @@ export class BackgroundJobScheduler {
       const task = cron.schedule(config.schedule, async () => {
         await this.executeJob(jobName);
       }, {
-        scheduled: false,
         timezone: 'UTC'
       });
 

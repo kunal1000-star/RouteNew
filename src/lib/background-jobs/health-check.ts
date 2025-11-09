@@ -2,10 +2,13 @@
 // ================
 
 import { aiServiceManager } from '../ai/ai-service-manager-unified';
-import { rateLimitTracker } from '../ai/rate-limit-tracker';
 import { supabase } from '../supabase';
+import type { Database } from '../database.types';
+import { rateLimitTracker } from '../ai/rate-limit-tracker';
 import type { JobResult } from './scheduler';
 import type { AIProvider } from '@/types/api-test';
+
+const supabaseClient = supabase as any; // Temporary fix for type issues
 
 interface ProviderHealthCheck {
   provider: AIProvider;

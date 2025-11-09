@@ -1,419 +1,211 @@
-// Layer 2: Context & Memory Management System
-// ============================================
-// ContextOptimizer - Context optimization with token budget management,
-// relevance scoring algorithms, context compression and summarization,
-// and dynamic context adjustment
+// Layer 2: Context Optimizer for Token Budget Management
+// ========================================================
+// ContextOptimizer - Intelligent context optimization for study sessions
+// with token budget management, quality preservation, and adaptive compression
 
+import { EnhancedContext, ContextLevel } from './EnhancedContextBuilder';
+import { KnowledgeSearchResult } from './KnowledgeBase';
+import { MemorySearchResult } from './ConversationMemory';
 import { logError, logWarning, logInfo } from '@/lib/error-logger';
-import { createHash } from 'crypto';
 
-export type ContextLevel = 'light' | 'recent' | 'selective' | 'full';
-export type OptimizationStrategy = 'compression' | 'truncation' | 'summarization' | 'relevance_filtering' | 'hierarchical';
-export type CompressionLevel = 'low' | 'medium' | 'high' | 'aggressive';
-export type TokenBudgetStrategy = 'strict' | 'flexible' | 'adaptive' | 'priority_based';
+export type OptimizationStrategy = 'quality_preserving' | 'size_reducing' | 'balanced' | 'performance_oriented';
+export type ContextComponent = 'profile' | 'knowledge' | 'memory' | 'sources' | 'history';
 
-export interface ContextOptimizationRequest {
-  userId: string;
-  conversationId?: string;
-  originalContext: OptimizableContext;
-  targetLevel: ContextLevel;
-  maxTokens: number;
-  optimizationStrategy: OptimizationStrategy;
-  tokenBudgetStrategy: TokenBudgetStrategy;
-  compressionLevel?: CompressionLevel;
-  preserveCritical?: boolean;
-  preserveRecent?: boolean;
-  includeMetadata?: boolean;
-  qualityThreshold?: number;
-  relevanceThreshold?: number;
-}
-
-export interface OptimizableContext {
-  userProfile?: UserProfileContext;
-  conversationHistory?: ConversationContext[];
-  knowledgeBase?: KnowledgeContext[];
-  externalSources?: ExternalContext[];
-  systemContext?: SystemContext;
-  metadata?: ContextMetadata;
-  totalTokens?: number;
-}
-
-export interface UserProfileContext {
-  id: string;
-  name?: string;
-  academicLevel: string;
-  subjects: string[];
-  strengths: string[];
-  weaknesses: string[];
-  studyGoals: string[];
-  learningStyle: LearningStyleData;
-  preferences: UserPreferences;
-  progressData: StudyProgress;
-  totalTokens: number;
-}
-
-export interface ConversationContext {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: Date;
-  tokenCount: number;
-  relevanceScore: number;
-  qualityScore: number;
-  contextValue: 'critical' | 'important' | 'contextual' | 'supplementary';
-  category?: string;
-  tags: string[];
-  linkedToKnowledgeBase: boolean;
-  crossConversationLinked: boolean;
-}
-
-export interface KnowledgeContext {
-  id: string;
-  title: string;
-  content: string;
-  source: string;
-  reliability: number;
-  relevanceScore: number;
-  lastUpdated: Date;
-  tokenCount: number;
-  verificationStatus: 'verified' | 'pending' | 'disputed';
-  category: string;
-  tags: string[];
-  factType: 'fact' | 'opinion' | 'hypothesis' | 'definition';
-}
-
-export interface ExternalContext {
-  type: 'api' | 'database' | 'external_service';
-  source: string;
-  data: any;
-  lastAccessed: Date;
-  reliability: number;
-  tokenCount: number;
-  contextValue: 'critical' | 'important' | 'contextual';
-}
-
-export interface SystemContext {
-  sessionInfo: SessionInfo;
-  systemStatus: SystemStatus;
-  availableFeatures: string[];
-  currentTime: Date;
-  tokenCount: number;
-}
-
-export interface ContextMetadata {
-  createdAt: Date;
-  lastUpdated: Date;
-  version: number;
-  contextHash: string;
-  optimizationHistory: OptimizationRecord[];
-  accessPatterns: AccessPattern[];
-  qualityMetrics: ContextQualityMetrics;
-}
-
-export interface LearningStyleData {
-  visual: number;
-  auditory: number;
-  kinesthetic: number;
-  reading: number;
-  preferredFormats: string[];
-}
-
-export interface UserPreferences {
-  responseFormat: 'plain_text' | 'structured' | 'step_by_step' | 'bulleted';
-  detailLevel: 'concise' | 'detailed' | 'comprehensive';
-  languageStyle: 'casual' | 'formal' | 'academic';
-  feedbackPreference: 'immediate' | 'periodic' | 'end_of_session';
-}
-
-export interface StudyProgress {
-  totalBlocksCompleted: number;
-  currentStreak: number;
-  totalStudyTime: number;
-  subjectProgress: Record<string, number>;
-  recentAchievements: string[];
-  learningVelocity: number;
-}
-
-export interface SessionInfo {
-  sessionId: string;
-  startTime: Date;
-  duration: number;
-  interactionCount: number;
-  contextSwitches: number;
-}
-
-export interface SystemStatus {
-  status: 'operational' | 'degraded' | 'maintenance';
-  activeServices: string[];
-  performance: PerformanceMetrics;
-  alerts: string[];
-}
-
-export interface PerformanceMetrics {
-  responseTime: number;
-  accuracy: number;
-  userSatisfaction: number;
-  contextRelevance: number;
-}
-
-export interface OptimizationRecord {
-  id: string;
-  timestamp: Date;
+export interface OptimizationRequest {
+  context: EnhancedContext;
+  tokenLimit: number;
   strategy: OptimizationStrategy;
-  originalTokens: number;
-  optimizedTokens: number;
-  reductionRatio: number;
-  qualityRetention: number;
-  metadata: Record<string, any>;
+  preserveComponents?: ContextComponent[];
+  minimumQuality?: number;
+  educationalPriority?: boolean;
+  queryContext?: string;
 }
 
-export interface AccessPattern {
-  timestamp: Date;
-  contextType: string;
-  accessCount: number;
-  relevanceScore: number;
-}
-
-export interface ContextQualityMetrics {
-  averageRelevance: number;
-  averageQuality: number;
-  completeness: number;
-  freshness: number;
-  consistency: number;
-}
-
-export interface ContextOptimizationResult {
-  optimizationId: string;
-  originalContext: OptimizableContext;
-  optimizedContext: OptimizableContext;
-  optimizationStrategy: OptimizationStrategy;
-  tokenBudgetStrategy: TokenBudgetStrategy;
-  tokenReduction: {
-    original: number;
-    optimized: number;
-    reductionRatio: number;
-    tokensSaved: number;
-  };
-  qualityMetrics: {
-    relevanceRetention: number;
-    completenessRetention: number;
-    criticalInfoPreserved: boolean;
-    recentInfoPreserved: boolean;
-  };
-  processingTime: number;
+export interface OptimizationResult {
+  optimizedContext: EnhancedContext;
+  tokenReduction: number;
+  qualityScore: number;
+  compressionRatio: number;
+  preservedInformation: PreservedInformation;
+  optimizationDetails: OptimizationDetails;
   recommendations: string[];
-  appliedOptimizations: AppliedOptimization[];
 }
 
-export interface AppliedOptimization {
-  type: 'compression' | 'filtering' | 'summarization' | 'reordering' | 'deduplication';
-  description: string;
-  tokensAffected: number;
+export interface PreservedInformation {
+  criticalFacts: string[];
+  learningObjectives: string[];
+  studentPreferences: Partial<{
+    learningStyle: string;
+    difficulty: number;
+    subjects: string[];
+  }>;
+  recentProgress: string;
+  knowledgeGaps: string[];
+}
+
+export interface OptimizationDetails {
+  originalTokenCount: number;
+  optimizedTokenCount: number;
+  componentsOptimized: ContextComponent[];
+  compressionTechniques: string[];
+  tradeoffs: OptimizationTradeoff[];
+  performanceImpact: number;
+}
+
+export interface OptimizationTradeoff {
+  component: ContextComponent;
+  originalSize: number;
+  optimizedSize: number;
+  informationLoss: number;
   qualityImpact: number;
-  metadata: Record<string, any>;
-}
-
-export interface TokenBudgetAllocation {
-  category: string;
-  allocated: number;
-  used: number;
-  remaining: number;
-  priority: number;
-  isFlexible: boolean;
-}
-
-export interface RelevanceScoringResult {
-  itemId: string;
-  itemType: 'conversation' | 'knowledge' | 'profile' | 'external' | 'system';
-  relevanceScore: number;
-  factors: RelevanceFactor[];
-  finalScore: number;
   reason: string;
 }
 
-export interface RelevanceFactor {
-  factor: 'recency' | 'quality' | 'relevance' | 'importance' | 'frequency' | 'connection';
-  weight: number;
-  score: number;
-  explanation: string;
+export interface TokenBudget {
+  total: number;
+  allocated: Record<ContextComponent, number>;
+  remaining: number;
+  efficiency: number;
 }
 
-export interface CompressionStrategy {
-  type: 'lossless' | 'lossy' | 'semantic' | 'structural';
-  level: CompressionLevel;
-  preserveStructure: boolean;
-  preserveKeyInfo: boolean;
-  targetReduction: number;
-}
-
-export interface DynamicAdjustmentRequest {
-  currentTokens: number;
-  targetTokens: number;
-  timeConstraint: number; // milliseconds
-  qualityRequirement: number; // 0-1
-  contextType: ContextLevel;
-  availableStrategies: OptimizationStrategy[];
-}
-
-export interface DynamicAdjustmentResult {
-  adjustedTokens: number;
-  strategy: OptimizationStrategy;
-  confidence: number;
-  estimatedQuality: number;
-  processingTime: number;
-  fallbackUsed: boolean;
+export interface CompressionProfile {
+  component: ContextComponent;
+  baseCompression: number;
+  qualityWeight: number;
+  educationalWeight: number;
+  priority: number;
+  maxCompression: number;
 }
 
 export class ContextOptimizer {
-  private static readonly DEFAULT_TOKEN_LIMITS = {
-    light: 500,
-    recent: 1500,
-    selective: 3000,
-    full: 8000
-  };
+  private static readonly DEFAULT_TOKEN_LIMIT = 2048;
+  private static readonly MIN_QUALITY_THRESHOLD = 0.6;
+  private static readonly OPTIMIZATION_CACHE_SIZE = 100;
 
-  private static readonly RELEVANCE_WEIGHTS = {
-    recency: 0.25,
-    quality: 0.25,
-    relevance: 0.20,
-    importance: 0.15,
-    frequency: 0.10,
-    connection: 0.05
-  };
-
-  private static readonly QUALITY_THRESHOLDS = {
-    critical: 0.9,
-    important: 0.7,
-    contextual: 0.5,
-    supplementary: 0.3
-  };
-
-  private cryptoKey: string;
-  private optimizationCache: Map<string, { result: ContextOptimizationResult; timestamp: Date; expiresAt: Date }> = new Map();
-  private tokenCounters: Map<string, number> = new Map();
-  private cacheCleanupInterval: NodeJS.Timeout | null = null;
+  private compressionProfiles: Map<ContextComponent, CompressionProfile> = new Map();
+  private optimizationCache: Map<string, { result: OptimizationResult; timestamp: Date; expiresAt: Date }> = new Map();
 
   constructor() {
-    this.cryptoKey = process.env.CONTEXT_OPTIMIZER_KEY || 'default-optimizer-key';
+    this.initializeCompressionProfiles();
     this.startCacheCleanup();
   }
 
   /**
-   * Main optimization method
+   * Optimize context for token budget
    */
-  async optimizeContext(request: ContextOptimizationRequest): Promise<ContextOptimizationResult> {
+  async optimizeContext(request: OptimizationRequest): Promise<OptimizationResult> {
     const startTime = Date.now();
     
     try {
       logInfo('Context optimization started', {
         componentName: 'ContextOptimizer',
-        userId: request.userId,
-        targetLevel: request.targetLevel,
-        maxTokens: request.maxTokens,
-        optimizationStrategy: request.optimizationStrategy
+        tokenLimit: request.tokenLimit,
+        strategy: request.strategy,
+        originalTokens: request.context.tokenUsage.total
       });
 
-      // Calculate current token usage
-      const currentTokens = this.countTotalTokens(request.originalContext);
-      
-      if (currentTokens <= request.maxTokens) {
-        logInfo('No optimization needed - within token limit', {
+      // Check cache first
+      const cacheKey = this.generateCacheKey(request);
+      const cached = this.optimizationCache.get(cacheKey);
+      if (cached && cached.expiresAt > new Date()) {
+        logInfo('Returning cached optimization result', {
           componentName: 'ContextOptimizer',
-          userId: request.userId,
-          currentTokens,
-          maxTokens: request.maxTokens
+          originalTokens: request.context.tokenUsage.total,
+          cachedTokens: cached.result.optimizedContext.tokenUsage.total
         });
-
-        return this.createNoOptimizationResult(request, currentTokens);
+        return cached.result;
       }
 
-      // Apply optimization strategy
-      let optimizedContext: OptimizableContext;
-      let appliedOptimizations: AppliedOptimization[] = [];
-
-      switch (request.optimizationStrategy) {
-        case 'compression':
-          const compressionResult = await this.applyCompressionOptimization(request);
-          optimizedContext = compressionResult.context;
-          appliedOptimizations = compressionResult.optimizations;
-          break;
-          
-        case 'truncation':
-          const truncationResult = await this.applyTruncationOptimization(request);
-          optimizedContext = truncationResult.context;
-          appliedOptimizations = truncationResult.optimizations;
-          break;
-          
-        case 'summarization':
-          const summarizationResult = await this.applySummarizationOptimization(request);
-          optimizedContext = summarizationResult.context;
-          appliedOptimizations = summarizationResult.optimizations;
-          break;
-          
-        case 'relevance_filtering':
-          const filteringResult = await this.applyRelevanceFiltering(request);
-          optimizedContext = filteringResult.context;
-          appliedOptimizations = filteringResult.optimizations;
-          break;
-          
-        case 'hierarchical':
-          const hierarchicalResult = await this.applyHierarchicalOptimization(request);
-          optimizedContext = hierarchicalResult.context;
-          appliedOptimizations = hierarchicalResult.optimizations;
-          break;
-          
-        default:
-          throw new Error(`Unknown optimization strategy: ${request.optimizationStrategy}`);
+      // Validate input
+      const validation = this.validateOptimizationRequest(request);
+      if (!validation.isValid) {
+        throw new Error(`Invalid optimization request: ${validation.errors.join(', ')}`);
       }
 
-      // Calculate final token count
-      const finalTokens = this.countTotalTokens(optimizedContext);
+      // Calculate token budget allocation
+      const tokenBudget = this.calculateTokenBudget(request);
       
-      // Calculate quality metrics
-      const qualityMetrics = this.calculateQualityRetention(
-        request.originalContext,
-        optimizedContext,
-        request
-      );
-
-      // Generate recommendations
-      const recommendations = this.generateOptimizationRecommendations(
-        request,
-        appliedOptimizations,
-        qualityMetrics
-      );
-
-      const result: ContextOptimizationResult = {
-        optimizationId: this.generateOptimizationId(),
-        originalContext: request.originalContext,
-        optimizedContext,
-        optimizationStrategy: request.optimizationStrategy,
-        tokenBudgetStrategy: request.tokenBudgetStrategy,
-        tokenReduction: {
-          original: currentTokens,
-          optimized: finalTokens,
-          reductionRatio: currentTokens > 0 ? (currentTokens - finalTokens) / currentTokens : 0,
-          tokensSaved: currentTokens - finalTokens
-        },
-        qualityMetrics,
-        processingTime: Date.now() - startTime,
-        recommendations,
-        appliedOptimizations
+      // Apply optimization strategy
+      let optimizedContext = { ...request.context };
+      const optimizationDetails: OptimizationDetails = {
+        originalTokenCount: request.context.tokenUsage.total,
+        optimizedTokenCount: request.context.tokenUsage.total,
+        componentsOptimized: [],
+        compressionTechniques: [],
+        tradeoffs: [],
+        performanceImpact: 0
       };
 
-      // Cache result
-      this.cacheOptimizationResult(result);
+      switch (request.strategy) {
+        case 'quality_preserving':
+          const qualityResult = await this.applyQualityPreservingOptimization(optimizedContext, tokenBudget, request);
+          optimizedContext = qualityResult.context;
+          optimizationDetails.tradeoffs = qualityResult.tradeoffs;
+          optimizationDetails.compressionTechniques = qualityResult.techniques;
+          break;
+
+        case 'size_reducing':
+          const sizeResult = await this.applySizeReducingOptimization(optimizedContext, tokenBudget, request);
+          optimizedContext = sizeResult.context;
+          optimizationDetails.tradeoffs = sizeResult.tradeoffs;
+          optimizationDetails.compressionTechniques = sizeResult.techniques;
+          break;
+
+        case 'balanced':
+          const balancedResult = await this.applyBalancedOptimization(optimizedContext, tokenBudget, request);
+          optimizedContext = balancedResult.context;
+          optimizationDetails.tradeoffs = balancedResult.tradeoffs;
+          optimizationDetails.compressionTechniques = balancedResult.techniques;
+          break;
+
+        case 'performance_oriented':
+          const performanceResult = await this.applyPerformanceOptimization(optimizedContext, tokenBudget, request);
+          optimizedContext = performanceResult.context;
+          optimizationDetails.tradeoffs = performanceResult.tradeoffs;
+          optimizationDetails.compressionTechniques = performanceResult.techniques;
+          break;
+      }
+
+      // Calculate final metrics
+      const finalTokenUsage = this.calculateTokenUsage(optimizedContext);
+      optimizedContext.tokenUsage = finalTokenUsage;
+      optimizationDetails.optimizedTokenCount = finalTokenUsage.total;
+
+      // Calculate quality score
+      const qualityScore = this.calculateQualityScore(optimizedContext, request);
       
-      // Log optimization
-      await this.logOptimizationResult(request, result);
+      // Create preserved information summary
+      const preservedInformation = this.extractPreservedInformation(optimizedContext, request);
+      
+      // Generate recommendations
+      const recommendations = this.generateOptimizationRecommendations(optimizedContext, request, optimizationDetails);
+
+      const result: OptimizationResult = {
+        optimizedContext,
+        tokenReduction: request.context.tokenUsage.total - finalTokenUsage.total,
+        qualityScore,
+        compressionRatio: finalTokenUsage.total / request.context.tokenUsage.total,
+        preservedInformation,
+        optimizationDetails: {
+          ...optimizationDetails,
+          componentsOptimized: this.identifyOptimizedComponents(request.context, optimizedContext)
+        },
+        recommendations
+      };
+
+      // Cache the result
+      this.optimizationCache.set(cacheKey, {
+        result,
+        timestamp: new Date(),
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000) // 15 minutes
+      });
 
       const processingTime = Date.now() - startTime;
       logInfo('Context optimization completed', {
         componentName: 'ContextOptimizer',
-        optimizationId: result.optimizationId,
-        originalTokens: currentTokens,
-        optimizedTokens: finalTokens,
-        reductionRatio: result.tokenReduction.reductionRatio,
+        originalTokens: request.context.tokenUsage.total,
+        optimizedTokens: finalTokenUsage.total,
+        qualityScore,
         processingTime
       });
 
@@ -423,1581 +215,685 @@ export class ContextOptimizer {
       logError(error instanceof Error ? error : new Error(String(error)), {
         componentName: 'ContextOptimizer',
         operation: 'optimize_context',
-        userId: request.userId,
-        optimizationStrategy: request.optimizationStrategy
+        tokenLimit: request.tokenLimit
       });
 
-      throw new Error(`Context optimization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * Manage token budget allocation
-   */
-  async allocateTokenBudget(
-    context: OptimizableContext,
-    totalBudget: number,
-    strategy: TokenBudgetStrategy = 'adaptive'
-  ): Promise<TokenBudgetAllocation[]> {
-    const allocations: TokenBudgetAllocation[] = [];
-
-    try {
-      logInfo('Token budget allocation started', {
-        componentName: 'ContextOptimizer',
-        totalBudget,
-        strategy
-      });
-
-      switch (strategy) {
-        case 'strict':
-          allocations.push(...this.allocateStrictBudget(context, totalBudget));
-          break;
-          
-        case 'flexible':
-          allocations.push(...this.allocateFlexibleBudget(context, totalBudget));
-          break;
-          
-        case 'adaptive':
-          allocations.push(...this.allocateAdaptiveBudget(context, totalBudget));
-          break;
-          
-        case 'priority_based':
-          allocations.push(...this.allocatePriorityBasedBudget(context, totalBudget));
-          break;
-          
-        default:
-          throw new Error(`Unknown token budget strategy: ${strategy}`);
-      }
-
-      // Validate allocations
-      const totalAllocated = allocations.reduce((sum, alloc) => sum + alloc.allocated, 0);
-      if (totalAllocated > totalBudget) {
-        logWarning('Token budget allocation exceeds total budget', {
-          componentName: 'ContextOptimizer',
-          totalAllocated,
-          totalBudget
-        });
-      }
-
-      logInfo('Token budget allocation completed', {
-        componentName: 'ContextOptimizer',
-        totalAllocated,
-        totalBudget,
-        categories: allocations.length
-      });
-
-      return allocations;
-
-    } catch (error) {
-      logError(error instanceof Error ? error : new Error(String(error)), {
-        componentName: 'ContextOptimizer',
-        operation: 'allocate_token_budget',
-        strategy
-      });
-
-      return this.createDefaultAllocations(context, totalBudget);
-    }
-  }
-
-  /**
-   * Calculate relevance scores for context items
-   */
-  async calculateRelevanceScores(
-    context: OptimizableContext,
-    userId: string,
-    currentQuery?: string
-  ): Promise<RelevanceScoringResult[]> {
-    const results: RelevanceScoringResult[] = [];
-
-    try {
-      logInfo('Relevance scoring started', {
-        componentName: 'ContextOptimizer',
-        userId,
-        hasQuery: !!currentQuery
-      });
-
-      // Score conversation history
-      if (context.conversationHistory) {
-        for (const conv of context.conversationHistory) {
-          const result = this.scoreConversationRelevance(conv, currentQuery, userId);
-          results.push(result);
-        }
-      }
-
-      // Score knowledge base
-      if (context.knowledgeBase) {
-        for (const kb of context.knowledgeBase) {
-          const result = this.scoreKnowledgeRelevance(kb, currentQuery, userId);
-          results.push(result);
-        }
-      }
-
-      // Score user profile
-      if (context.userProfile) {
-        const result = this.scoreProfileRelevance(context.userProfile, currentQuery, userId);
-        results.push(result);
-      }
-
-      // Score external sources
-      if (context.externalSources) {
-        for (const ext of context.externalSources) {
-          const result = this.scoreExternalRelevance(ext, currentQuery, userId);
-          results.push(result);
-        }
-      }
-
-      // Score system context
-      if (context.systemContext) {
-        const result = this.scoreSystemRelevance(context.systemContext, currentQuery, userId);
-        results.push(result);
-      }
-
-      // Sort by final score
-      results.sort((a, b) => b.finalScore - a.finalScore);
-
-      logInfo('Relevance scoring completed', {
-        componentName: 'ContextOptimizer',
-        userId,
-        scoredItems: results.length,
-        averageScore: results.reduce((sum, r) => sum + r.finalScore, 0) / results.length
-      });
-
-      return results;
-
-    } catch (error) {
-      logError(error instanceof Error ? error : new Error(String(error)), {
-        componentName: 'ContextOptimizer',
-        operation: 'calculate_relevance_scores',
-        userId
-      });
-
-      return [];
-    }
-  }
-
-  /**
-   * Apply dynamic context adjustment based on changing requirements
-   */
-  async adjustContextDynamically(
-    request: DynamicAdjustmentRequest
-  ): Promise<DynamicAdjustmentResult> {
-    const startTime = Date.now();
-    
-    try {
-      logInfo('Dynamic context adjustment started', {
-        componentName: 'ContextOptimizer',
-        currentTokens: request.currentTokens,
-        targetTokens: request.targetTokens,
-        timeConstraint: request.timeConstraint
-      });
-
-      let adjustedTokens = request.currentTokens;
-      let strategy: OptimizationStrategy = request.availableStrategies[0];
-      let confidence = 0.5;
-      let estimatedQuality = 0.8;
-      let fallbackUsed = false;
-
-      // Calculate adjustment needed
-      const adjustmentNeeded = request.currentTokens - request.targetTokens;
-      
-      if (adjustmentNeeded <= 0) {
-        // No reduction needed
-        return {
-          adjustedTokens: request.currentTokens,
-          strategy: 'relevance_filtering',
-          confidence: 1.0,
-          estimatedQuality: 0.9,
-          processingTime: Date.now() - startTime,
-          fallbackUsed: false
-        };
-      }
-
-      // Select best strategy based on constraints
-      const strategyPerformance = this.evaluateStrategyPerformance(
-        request.availableStrategies,
-        adjustmentNeeded,
-        request.qualityRequirement,
-        request.timeConstraint
-      );
-
-      if (strategyPerformance.bestStrategy) {
-        strategy = strategyPerformance.bestStrategy;
-        confidence = strategyPerformance.confidence;
-        estimatedQuality = strategyPerformance.estimatedQuality;
-      } else {
-        // Fallback to most reliable strategy
-        strategy = 'relevance_filtering';
-        confidence = 0.3;
-        estimatedQuality = 0.6;
-        fallbackUsed = true;
-      }
-
-      // Estimate token reduction
-      const estimatedReduction = this.estimateTokenReduction(strategy, request.currentTokens, request.qualityRequirement);
-      adjustedTokens = Math.max(request.targetTokens, request.currentTokens - estimatedReduction);
-
-      const result: DynamicAdjustmentResult = {
-        adjustedTokens,
-        strategy,
-        confidence,
-        estimatedQuality,
-        processingTime: Date.now() - startTime,
-        fallbackUsed
-      };
-
-      logInfo('Dynamic context adjustment completed', {
-        componentName: 'ContextOptimizer',
-        originalTokens: request.currentTokens,
-        adjustedTokens,
-        strategy,
-        confidence,
-        processingTime: result.processingTime
-      });
-
-      return result;
-
-    } catch (error) {
-      logError(error instanceof Error ? error : new Error(String(error)), {
-        componentName: 'ContextOptimizer',
-        operation: 'adjust_context_dynamically'
-      });
-
+      // Return original context if optimization fails
       return {
-        adjustedTokens: request.currentTokens,
-        strategy: 'relevance_filtering',
-        confidence: 0.0,
-        estimatedQuality: 0.0,
-        processingTime: Date.now() - startTime,
-        fallbackUsed: true
+        optimizedContext: request.context,
+        tokenReduction: 0,
+        qualityScore: 1.0,
+        compressionRatio: 1.0,
+        preservedInformation: this.extractPreservedInformation(request.context, request),
+        optimizationDetails: {
+          originalTokenCount: request.context.tokenUsage.total,
+          optimizedTokenCount: request.context.tokenUsage.total,
+          componentsOptimized: [],
+          compressionTechniques: [],
+          tradeoffs: [],
+          performanceImpact: 0
+        },
+        recommendations: ['Optimization failed, using original context']
       };
     }
+  }
+
+  /**
+   * Apply quality-preserving optimization
+   */
+  private async applyQualityPreservingOptimization(
+    context: EnhancedContext, 
+    budget: TokenBudget, 
+    request: OptimizationRequest
+  ): Promise<{ context: EnhancedContext; tradeoffs: OptimizationTradeoff[]; techniques: string[] }> {
+    
+    const tradeoffs: OptimizationTradeoff[] = [];
+    const techniques: string[] = [];
+    let optimizedContext = { ...context };
+
+    // Always preserve student profile
+    if (budget.allocated.profile < context.tokenUsage.profile) {
+      const profileOptimization = this.compressProfile(optimizedContext.studentProfile, budget.allocated.profile);
+      optimizedContext.studentProfile = profileOptimization.compressed;
+      tradeoffs.push({
+        component: 'profile',
+        originalSize: context.tokenUsage.profile,
+        optimizedSize: profileOptimization.tokenCount,
+        informationLoss: profileOptimization.informationLoss,
+        qualityImpact: profileOptimization.qualityImpact,
+        reason: 'Token budget constraint'
+      });
+      techniques.push('Profile compression');
+    }
+
+    // Optimize knowledge base (high priority for educational content)
+    if (budget.allocated.knowledge < context.tokenUsage.knowledge && request.educationalPriority) {
+      const knowledgeOptimization = await this.compressKnowledgeBase(
+        optimizedContext.knowledgeBase, 
+        budget.allocated.knowledge,
+        'quality_preserving'
+      );
+      optimizedContext.knowledgeBase = knowledgeOptimization.compressed;
+      tradeoffs.push({
+        component: 'knowledge',
+        originalSize: context.tokenUsage.knowledge,
+        optimizedSize: knowledgeOptimization.tokenCount,
+        informationLoss: knowledgeOptimization.informationLoss,
+        qualityImpact: knowledgeOptimization.qualityImpact,
+        reason: 'Educational content compression'
+      });
+      techniques.push('Knowledge base optimization');
+    }
+
+    // Optimize conversation history
+    if (budget.allocated.history < context.tokenUsage.history) {
+      const historyOptimization = this.compressConversationHistory(
+        optimizedContext.conversationHistory, 
+        budget.allocated.history
+      );
+      optimizedContext.conversationHistory = historyOptimization.compressed;
+      tradeoffs.push({
+        component: 'history',
+        originalSize: context.tokenUsage.history,
+        optimizedSize: historyOptimization.tokenCount,
+        informationLoss: historyOptimization.informationLoss,
+        qualityImpact: historyOptimization.qualityImpact,
+        reason: 'History compression'
+      });
+      techniques.push('Conversation history compression');
+    }
+
+    return { context: optimizedContext, tradeoffs, techniques };
+  }
+
+  /**
+   * Apply size-reducing optimization
+   */
+  private async applySizeReducingOptimization(
+    context: EnhancedContext, 
+    budget: TokenBudget, 
+    request: OptimizationRequest
+  ): Promise<{ context: EnhancedContext; tradeoffs: OptimizationTradeoff[]; techniques: string[] }> {
+    
+    const tradeoffs: OptimizationTradeoff[] = [];
+    const techniques: string[] = [];
+    let optimizedContext = { ...context };
+
+    // Aggressive compression of all components
+    const compressionTargets = [
+      { component: 'knowledge' as ContextComponent, currentSize: context.tokenUsage.knowledge, allocator: () => budget.allocated.knowledge },
+      { component: 'history' as ContextComponent, currentSize: context.tokenUsage.history, allocator: () => budget.allocated.history },
+      { component: 'sources' as ContextComponent, currentSize: context.tokenUsage.sources, allocator: () => budget.allocated.sources }
+    ];
+
+    for (const target of compressionTargets) {
+      const allocated = target.allocator();
+      if (allocated < target.currentSize) {
+        switch (target.component) {
+          case 'knowledge':
+            const knowledgeOptimization = await this.compressKnowledgeBase(
+              optimizedContext.knowledgeBase, 
+              allocated,
+              'size_reducing'
+            );
+            optimizedContext.knowledgeBase = knowledgeOptimization.compressed;
+            break;
+          case 'history':
+            const historyOptimization = this.compressConversationHistory(
+              optimizedContext.conversationHistory, 
+              allocated
+            );
+            optimizedContext.conversationHistory = historyOptimization.compressed;
+            break;
+          case 'sources':
+            const sourcesOptimization = this.compressSources(
+              optimizedContext.externalSources, 
+              allocated
+            );
+            optimizedContext.externalSources = sourcesOptimization.compressed;
+            break;
+        }
+
+        tradeoffs.push({
+          component: target.component,
+          originalSize: target.currentSize,
+          optimizedSize: allocated,
+          informationLoss: 0.3, // Aggressive compression
+          qualityImpact: 0.2,
+          reason: 'Aggressive size reduction'
+        });
+        techniques.push(`${target.component} aggressive compression`);
+      }
+    }
+
+    return { context: optimizedContext, tradeoffs, techniques };
+  }
+
+  /**
+   * Apply balanced optimization
+   */
+  private async applyBalancedOptimization(
+    context: EnhancedContext, 
+    budget: TokenBudget, 
+    request: OptimizationRequest
+  ): Promise<{ context: EnhancedContext; tradeoffs: OptimizationTradeoff[]; techniques: string[] }> {
+    
+    const tradeoffs: OptimizationTradeoff[] = [];
+    const techniques: string[] = [];
+    let optimizedContext = { ...context };
+
+    // Balanced compression across all components
+    const compressionFactors = {
+      profile: 0.1,    // Minimal compression for profile
+      knowledge: 0.4,  // Moderate compression for knowledge
+      memory: 0.3,     // Moderate compression for memory
+      sources: 0.5,    // Higher compression for sources
+      history: 0.4     // Moderate compression for history
+    };
+
+    for (const [component, factor] of Object.entries(compressionFactors)) {
+      const componentKey = component as ContextComponent;
+      const currentSize = this.getComponentTokenSize(context, componentKey);
+      const allocated = budget.allocated[componentKey] || 0;
+      const targetSize = currentSize * (1 - factor);
+
+      if (targetSize < allocated) {
+        switch (componentKey) {
+          case 'profile':
+            const profileOptimization = this.compressProfile(optimizedContext.studentProfile, targetSize);
+            optimizedContext.studentProfile = profileOptimization.compressed;
+            break;
+          case 'knowledge':
+            const knowledgeOptimization = await this.compressKnowledgeBase(
+              optimizedContext.knowledgeBase, 
+              targetSize,
+              'balanced'
+            );
+            optimizedContext.knowledgeBase = knowledgeOptimization.compressed;
+            break;
+          case 'history':
+            const historyOptimization = this.compressConversationHistory(
+              optimizedContext.conversationHistory, 
+              targetSize
+            );
+            optimizedContext.conversationHistory = historyOptimization.compressed;
+            break;
+          case 'sources':
+            const sourcesOptimization = this.compressSources(
+              optimizedContext.externalSources, 
+              targetSize
+            );
+            optimizedContext.externalSources = sourcesOptimization.compressed;
+            break;
+        }
+
+        tradeoffs.push({
+          component: componentKey,
+          originalSize: currentSize,
+          optimizedSize: targetSize,
+          informationLoss: factor * 0.5,
+          qualityImpact: factor * 0.3,
+          reason: 'Balanced compression'
+        });
+        techniques.push(`${component} balanced compression`);
+      }
+    }
+
+    return { context: optimizedContext, tradeoffs, techniques };
+  }
+
+  /**
+   * Apply performance-oriented optimization
+   */
+  private async applyPerformanceOptimization(
+    context: EnhancedContext, 
+    budget: TokenBudget, 
+    request: OptimizationRequest
+  ): Promise<{ context: EnhancedContext; tradeoffs: OptimizationTradeoff[]; techniques: string[] }> {
+    
+    const tradeoffs: OptimizationTradeoff[] = [];
+    const techniques: string[] = [];
+    let optimizedContext = { ...context };
+
+    // Optimize for fastest processing - prioritize cacheable, indexed content
+    if (budget.allocated.knowledge < context.tokenUsage.knowledge) {
+      const knowledgeOptimization = await this.compressKnowledgeBase(
+        optimizedContext.knowledgeBase, 
+        budget.allocated.knowledge,
+        'performance_oriented'
+      );
+      optimizedContext.knowledgeBase = knowledgeOptimization.compressed;
+      tradeoffs.push({
+        component: 'knowledge',
+        originalSize: context.tokenUsage.knowledge,
+        optimizedSize: knowledgeOptimization.tokenCount,
+        informationLoss: knowledgeOptimization.informationLoss,
+        qualityImpact: knowledgeOptimization.qualityImpact,
+        reason: 'Performance optimization'
+      });
+      techniques.push('Knowledge base performance optimization');
+    }
+
+    return { context: optimizedContext, tradeoffs, techniques };
   }
 
   /**
    * Private helper methods
    */
+  private validateOptimizationRequest(request: OptimizationRequest): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
 
-  private countTotalTokens(context: OptimizableContext): number {
-    let total = 0;
-
-    if (context.userProfile?.totalTokens) total += context.userProfile.totalTokens;
-    if (context.conversationHistory) {
-      total += context.conversationHistory.reduce((sum, conv) => sum + conv.tokenCount, 0);
-    }
-    if (context.knowledgeBase) {
-      total += context.knowledgeBase.reduce((sum, kb) => sum + kb.tokenCount, 0);
-    }
-    if (context.externalSources) {
-      total += context.externalSources.reduce((sum, ext) => sum + ext.tokenCount, 0);
-    }
-    if (context.systemContext?.tokenCount) total += context.systemContext.tokenCount;
-
-    return total;
-  }
-
-  private createNoOptimizationResult(
-    request: ContextOptimizationRequest,
-    currentTokens: number
-  ): ContextOptimizationResult {
-    return {
-      optimizationId: this.generateOptimizationId(),
-      originalContext: request.originalContext,
-      optimizedContext: request.originalContext,
-      optimizationStrategy: request.optimizationStrategy,
-      tokenBudgetStrategy: request.tokenBudgetStrategy,
-      tokenReduction: {
-        original: currentTokens,
-        optimized: currentTokens,
-        reductionRatio: 0,
-        tokensSaved: 0
-      },
-      qualityMetrics: {
-        relevanceRetention: 1.0,
-        completenessRetention: 1.0,
-        criticalInfoPreserved: true,
-        recentInfoPreserved: true
-      },
-      processingTime: 0,
-      recommendations: ['No optimization needed - context within token limits'],
-      appliedOptimizations: []
-    };
-  }
-
-  private async applyCompressionOptimization(request: ContextOptimizationRequest): Promise<{context: OptimizableContext, optimizations: AppliedOptimization[]}> {
-    const context = JSON.parse(JSON.stringify(request.originalContext)); // Deep clone
-    const optimizations: AppliedOptimization[] = [];
-
-    // Compress conversation history
-    if (context.conversationHistory && request.maxTokens < this.countTotalTokens(context)) {
-      const compressionResult = this.compressConversationHistory(context.conversationHistory, request);
-      context.conversationHistory = compressionResult.compressed;
-      optimizations.push(...compressionResult.optimizations);
+    if (!request.context) {
+      errors.push('Context is required');
     }
 
-    // Compress knowledge base
-    if (context.knowledgeBase && request.maxTokens < this.countTotalTokens(context)) {
-      const compressionResult = this.compressKnowledgeBase(context.knowledgeBase, request);
-      context.knowledgeBase = compressionResult.compressed;
-      optimizations.push(...compressionResult.optimizations);
+    if (!request.tokenLimit || request.tokenLimit < 100) {
+      errors.push('Token limit must be at least 100');
     }
 
-    // Compress user profile if needed
-    if (context.userProfile && request.maxTokens < this.countTotalTokens(context)) {
-      const compressionResult = this.compressUserProfile(context.userProfile, request);
-      context.userProfile = compressionResult.compressed;
-      optimizations.push(...compressionResult.optimizations);
-    }
-
-    return { context, optimizations };
-  }
-
-  private async applyTruncationOptimization(request: ContextOptimizationRequest): Promise<{context: OptimizableContext, optimizations: AppliedOptimization[]}> {
-    const context = JSON.parse(JSON.stringify(request.originalContext));
-    const optimizations: AppliedOptimization[] = [];
-    let remainingBudget = request.maxTokens;
-
-    // Prioritize by relevance and importance
-    const prioritizedItems = this.prioritizeContextItems(context, request);
-
-    // Start with lowest priority items
-    for (const item of prioritizedItems.reverse()) {
-      if (remainingBudget >= request.maxTokens) break;
-
-      switch (item.type) {
-        case 'conversation':
-          const truncated = this.truncateConversationItems(context.conversationHistory!, item.ids, remainingBudget);
-          context.conversationHistory = truncated.remaining;
-          remainingBudget = truncated.remainingBudget;
-          optimizations.push(...truncated.optimizations);
-          break;
-
-        case 'knowledge':
-          const knowledgeTruncated = this.truncateKnowledgeItems(context.knowledgeBase!, item.ids, remainingBudget);
-          context.knowledgeBase = knowledgeTruncated.remaining;
-          remainingBudget = knowledgeTruncated.remainingBudget;
-          optimizations.push(...knowledgeTruncated.optimizations);
-          break;
-
-        case 'external':
-          const externalTruncated = this.truncateExternalItems(context.externalSources!, item.ids, remainingBudget);
-          context.externalSources = externalTruncated.remaining;
-          remainingBudget = externalTruncated.remainingBudget;
-          optimizations.push(...externalTruncated.optimizations);
-          break;
-      }
-    }
-
-    return { context, optimizations };
-  }
-
-  private async applySummarizationOptimization(request: ContextOptimizationRequest): Promise<{context: OptimizableContext, optimizations: AppliedOptimization[]}> {
-    const context = JSON.parse(JSON.stringify(request.originalContext));
-    const optimizations: AppliedOptimization[] = [];
-
-    // Summarize conversation history
-    if (context.conversationHistory) {
-      const summaryResult = this.summarizeConversationHistory(context.conversationHistory, request);
-      context.conversationHistory = summaryResult.summarized;
-      optimizations.push(...summaryResult.optimizations);
-    }
-
-    // Summarize knowledge base
-    if (context.knowledgeBase) {
-      const summaryResult = this.summarizeKnowledgeBase(context.knowledgeBase, request);
-      context.knowledgeBase = summaryResult.summarized;
-      optimizations.push(...summaryResult.optimizations);
-    }
-
-    return { context, optimizations };
-  }
-
-  private async applyRelevanceFiltering(request: ContextOptimizationRequest): Promise<{context: OptimizableContext, optimizations: AppliedOptimization[]}> {
-    const context = JSON.parse(JSON.stringify(request.originalContext));
-    const optimizations: AppliedOptimization[] = [];
-
-    // Calculate relevance scores
-    const relevanceResults = await this.calculateRelevanceScores(context, request.userId);
-
-    // Filter conversation history
-    if (context.conversationHistory) {
-      const filtered = this.filterByRelevance(
-        context.conversationHistory,
-        relevanceResults.filter(r => r.itemType === 'conversation'),
-        request.relevanceThreshold || 0.5
-      );
-      context.conversationHistory = filtered.filtered;
-      optimizations.push(...filtered.optimizations);
-    }
-
-    // Filter knowledge base
-    if (context.knowledgeBase) {
-      const filtered = this.filterByRelevance(
-        context.knowledgeBase,
-        relevanceResults.filter(r => r.itemType === 'knowledge'),
-        request.relevanceThreshold || 0.5
-      );
-      context.knowledgeBase = filtered.filtered;
-      optimizations.push(...filtered.optimizations);
-    }
-
-    return { context, optimizations };
-  }
-
-  private async applyHierarchicalOptimization(request: ContextOptimizationRequest): Promise<{context: OptimizableContext, optimizations: AppliedOptimization[]}> {
-    const context = JSON.parse(JSON.stringify(request.originalContext));
-    const optimizations: AppliedOptimization[] = [];
-
-    // Define hierarchy levels
-    const hierarchy = this.defineContextHierarchy(request);
-
-    // Apply optimization level by level
-    for (const level of hierarchy.levels) {
-      if (this.countTotalTokens(context) <= request.maxTokens) break;
-
-      switch (level.action) {
-        case 'preserve':
-          // Keep as is
-          break;
-        case 'compress':
-          const compressionResult = this.compressContextLevel(context, level, request);
-          optimizations.push(...compressionResult.optimizations);
-          break;
-        case 'summarize':
-          const summaryResult = this.summarizeContextLevel(context, level, request);
-          optimizations.push(...summaryResult.optimizations);
-          break;
-        case 'remove':
-          const removalResult = this.removeContextLevel(context, level, request);
-          optimizations.push(...removalResult.optimizations);
-          break;
-      }
-    }
-
-    return { context, optimizations };
-  }
-
-  // Optimization strategy implementations
-  private compressConversationHistory(conversations: ConversationContext[], request: ContextOptimizationRequest): {compressed: ConversationContext[], optimizations: AppliedOptimization[]} {
-    const compressed = [...conversations];
-    const optimizations: AppliedOptimization[] = [];
-    let tokensSaved = 0;
-
-    for (let i = 0; i < compressed.length; i++) {
-      const conv = compressed[i];
-      const originalLength = conv.content.length;
-      
-      // Apply compression based on level
-      let compressedContent = conv.content;
-      switch (request.compressionLevel) {
-        case 'low':
-          compressedContent = this.lightCompression(conv.content);
-          break;
-        case 'medium':
-          compressedContent = this.mediumCompression(conv.content);
-          break;
-        case 'high':
-          compressedContent = this.highCompression(conv.content);
-          break;
-        case 'aggressive':
-          compressedContent = this.aggressiveCompression(conv.content);
-          break;
-      }
-
-      if (compressedContent !== conv.content) {
-        const saved = originalLength - compressedContent.length;
-        compressed[i] = { ...conv, content: compressedContent };
-        tokensSaved += saved;
-      }
-    }
-
-    optimizations.push({
-      type: 'compression',
-      description: `Compressed conversation history (${request.compressionLevel} level)`,
-      tokensAffected: tokensSaved,
-      qualityImpact: this.calculateCompressionQualityImpact(request.compressionLevel || 'medium'),
-      metadata: { compressionLevel: request.compressionLevel, itemsCompressed: compressed.length }
-    });
-
-    return { compressed, optimizations };
-  }
-
-  private compressKnowledgeBase(knowledge: KnowledgeContext[], request: ContextOptimizationRequest): {compressed: KnowledgeContext[], optimizations: AppliedOptimization[]} {
-    const compressed = [...knowledge];
-    const optimizations: AppliedOptimization[] = [];
-    let tokensSaved = 0;
-
-    for (let i = 0; i < compressed.length; i++) {
-      const kb = compressed[i];
-      const originalLength = kb.content.length;
-      
-      let compressedContent = kb.content;
-      
-      // Prioritize high-reliability sources for less compression
-      if (kb.reliability > 0.8) {
-        compressedContent = this.lightCompression(kb.content);
-      } else {
-        compressedContent = this.mediumCompression(kb.content);
-      }
-
-      if (compressedContent !== kb.content) {
-        const saved = originalLength - compressedContent.length;
-        compressed[i] = { ...kb, content: compressedContent };
-        tokensSaved += saved;
-      }
-    }
-
-    optimizations.push({
-      type: 'compression',
-      description: 'Compressed knowledge base content',
-      tokensAffected: tokensSaved,
-      qualityImpact: 0.1,
-      metadata: { itemsCompressed: compressed.length, averageReliability: knowledge.reduce((sum, k) => sum + k.reliability, 0) / knowledge.length }
-    });
-
-    return { compressed, optimizations };
-  }
-
-  private compressUserProfile(profile: UserProfileContext, request: ContextOptimizationRequest): {compressed: UserProfileContext, optimizations: AppliedOptimization[]} {
-    const compressed = { ...profile };
-    const optimizations: AppliedOptimization[] = [];
-    let tokensSaved = 0;
-
-    // Compress lists while preserving key information
-    if (compressed.subjects.length > 5) {
-      compressed.subjects = compressed.subjects.slice(0, 5);
-      tokensSaved += 50; // Estimated savings
-    }
-
-    if (compressed.strengths.length > 3) {
-      compressed.strengths = compressed.strengths.slice(0, 3);
-      tokensSaved += 30;
-    }
-
-    if (compressed.weaknesses.length > 3) {
-      compressed.weaknesses = compressed.weaknesses.slice(0, 3);
-      tokensSaved += 30;
-    }
-
-    optimizations.push({
-      type: 'compression',
-      description: 'Compressed user profile lists',
-      tokensAffected: tokensSaved,
-      qualityImpact: 0.05,
-      metadata: { subjectsKept: compressed.subjects.length, strengthsKept: compressed.strengths.length, weaknessesKept: compressed.weaknesses.length }
-    });
-
-    return { compressed, optimizations };
-  }
-
-  private lightCompression(text: string): string {
-    return text
-      .replace(/\s+/g, ' ')
-      .replace(/\n\s*\n/g, '\n')
-      .trim();
-  }
-
-  private mediumCompression(text: string): string {
-    return text
-      .replace(/\s+/g, ' ')
-      .replace(/\n\s*\n/g, '\n')
-      .replace(/\b(very|really|quite|pretty)\s+/gi, '')
-      .replace(/\b(okay|ok|alright)\b/gi, 'ok')
-      .trim();
-  }
-
-  private highCompression(text: string): string {
-    return text
-      .replace(/\s+/g, ' ')
-      .replace(/\n\s*\n/g, '\n')
-      .replace(/\b(very|really|quite|pretty|extremely|highly)\s+/gi, '')
-      .replace(/\b(okay|ok|alright|somewhat)\b/gi, 'ok')
-      .replace(/[,;]\s*[a-zA-Z]+$/g, '') // Remove trailing words after punctuation
-      .trim();
-  }
-
-  private aggressiveCompression(text: string): string {
-    return text
-      .replace(/\s+/g, ' ')
-      .replace(/\n+/g, ' ')
-      .replace(/\b(very|really|quite|pretty|extremely|highly|absolutely|definitely)\s+/gi, '')
-      .replace(/\b(okay|ok|alright|somewhat|maybe|perhaps)\b/gi, 'ok')
-      .replace(/[,;]\s*[a-zA-Z]+$/g, '')
-      .replace(/\b(the|a|an)\b\s+/gi, '')
-      .trim();
-  }
-
-  private calculateCompressionQualityImpact(level: CompressionLevel): number {
-    const impacts = {
-      low: 0.02,
-      medium: 0.05,
-      high: 0.1,
-      aggressive: 0.2
-    };
-    return impacts[level] || 0.05;
-  }
-
-  private prioritizeContextItems(context: OptimizableContext, request: ContextOptimizationRequest): Array<{type: string, ids: string[], priority: number}> {
-    const items: Array<{type: string, ids: string[], priority: number}> = [];
-
-    // Add conversation history
-    if (context.conversationHistory) {
-      const sorted = context.conversationHistory
-        .sort((a, b) => this.calculateItemPriority(b, request) - this.calculateItemPriority(a, request))
-        .map(conv => conv.id);
-      items.push({ type: 'conversation', ids: sorted, priority: this.calculateItemPriority({ contextValue: 'contextual' } as any, request) });
-    }
-
-    // Add knowledge base
-    if (context.knowledgeBase) {
-      const sorted = context.knowledgeBase
-        .sort((a, b) => b.relevanceScore - a.relevanceScore)
-        .map(kb => kb.id);
-      items.push({ type: 'knowledge', ids: sorted, priority: 0.6 });
-    }
-
-    // Add external sources
-    if (context.externalSources) {
-      const sorted = context.externalSources
-        .sort((a, b) => b.reliability - a.reliability)
-        .map(ext => ext.source);
-      items.push({ type: 'external', ids: sorted, priority: 0.4 });
-    }
-
-    return items.sort((a, b) => a.priority - b.priority); // Lowest priority first
-  }
-
-  private calculateItemPriority(item: any, request: ContextOptimizationRequest): number {
-    let priority = 0.5; // Base priority
-
-    // Context value priority
-    const valuePriorities = {
-      'critical': 1.0,
-      'important': 0.8,
-      'contextual': 0.6,
-      'supplementary': 0.4
-    };
-    priority *= valuePriorities[item.contextValue] || 0.6;
-
-    // Recent items get higher priority
-    if (item.timestamp) {
-      const ageInHours = (Date.now() - new Date(item.timestamp).getTime()) / (1000 * 60 * 60);
-      const recencyFactor = Math.max(0.1, 1 - (ageInHours / 24)); // Decay over 24 hours
-      priority *= recencyFactor;
-    }
-
-    // Quality score priority
-    if (item.qualityScore) {
-      priority *= item.qualityScore;
-    }
-
-    // Preserve critical and recent if requested
-    if (request.preserveCritical && item.contextValue === 'critical') {
-      priority *= 2;
-    }
-
-    if (request.preserveRecent && item.timestamp) {
-      const ageInHours = (Date.now() - new Date(item.timestamp).getTime()) / (1000 * 60 * 60);
-      if (ageInHours < 2) { // Recent (2 hours)
-        priority *= 1.5;
-      }
-    }
-
-    return Math.min(1.0, priority);
-  }
-
-  private truncateConversationItems(conversations: ConversationContext[], ids: string[], remainingBudget: number): {remaining: ConversationContext[], remainingBudget: number, optimizations: AppliedOptimization[]} {
-    const remaining = conversations.filter(conv => !ids.includes(conv.id));
-    const removed = conversations.length - remaining.length;
-    const tokensSaved = conversations
-      .filter(conv => ids.includes(conv.id))
-      .reduce((sum, conv) => sum + conv.tokenCount, 0);
-
-    const optimizations: AppliedOptimization[] = [{
-      type: 'truncation',
-      description: `Removed ${removed} low-priority conversation items`,
-      tokensAffected: tokensSaved,
-      qualityImpact: 0.15,
-      metadata: { itemsRemoved: removed, selectionCriteria: 'priority' }
-    }];
-
-    return { remaining, remainingBudget: remainingBudget + tokensSaved, optimizations };
-  }
-
-  private truncateKnowledgeItems(knowledge: KnowledgeContext[], ids: string[], remainingBudget: number): {remaining: KnowledgeContext[], remainingBudget: number, optimizations: AppliedOptimization[]} {
-    const remaining = knowledge.filter(kb => !ids.includes(kb.id));
-    const removed = knowledge.length - remaining.length;
-    const tokensSaved = knowledge
-      .filter(kb => ids.includes(kb.id))
-      .reduce((sum, kb) => sum + kb.tokenCount, 0);
-
-    const optimizations: AppliedOptimization[] = [{
-      type: 'truncation',
-      description: `Removed ${removed} low-relevance knowledge items`,
-      tokensAffected: tokensSaved,
-      qualityImpact: 0.1,
-      metadata: { itemsRemoved: removed, selectionCriteria: 'relevance' }
-    }];
-
-    return { remaining, remainingBudget: remainingBudget + tokensSaved, optimizations };
-  }
-
-  private truncateExternalItems(external: ExternalContext[], ids: string[], remainingBudget: number): {remaining: ExternalContext[], remainingBudget: number, optimizations: AppliedOptimization[]} {
-    const remaining = external.filter(ext => !ids.includes(ext.source));
-    const removed = external.length - remaining.length;
-    const tokensSaved = external
-      .filter(ext => ids.includes(ext.source))
-      .reduce((sum, ext) => sum + ext.tokenCount, 0);
-
-    const optimizations: AppliedOptimization[] = [{
-      type: 'truncation',
-      description: `Removed ${removed} low-priority external sources`,
-      tokensAffected: tokensSaved,
-      qualityImpact: 0.05,
-      metadata: { itemsRemoved: removed, selectionCriteria: 'priority' }
-    }];
-
-    return { remaining, remainingBudget: remainingBudget + tokensSaved, optimizations };
-  }
-
-  private summarizeConversationHistory(conversations: ConversationContext[], request: ContextOptimizationRequest): {summarized: ConversationContext[], optimizations: AppliedOptimization[]} {
-    const summarized = conversations.map(conv => {
-      const summary = this.createConversationSummary(conv);
-      return { ...conv, content: summary, tokenCount: Math.ceil(summary.length / 4) }; // Rough token estimation
-    });
-
-    const tokensSaved = conversations.reduce((sum, conv) => sum + conv.tokenCount, 0) - 
-                      summarized.reduce((sum, conv) => sum + conv.tokenCount, 0);
-
-    const optimizations: AppliedOptimization[] = [{
-      type: 'summarization',
-      description: 'Summarized conversation history',
-      tokensAffected: tokensSaved,
-      qualityImpact: 0.08,
-      metadata: { itemsSummarized: summarized.length, method: 'key_point_extraction' }
-    }];
-
-    return { summarized, optimizations };
-  }
-
-  private createConversationSummary(conv: ConversationContext): string {
-    // Simple extractive summarization - extract first and last sentences, key points
-    const sentences = conv.content.split(/[.!?]+/).filter(s => s.trim().length > 0);
-    
-    if (sentences.length <= 2) return conv.content;
-    
-    const firstSentence = sentences[0].trim();
-    const lastSentence = sentences[sentences.length - 1].trim();
-    const keyPoints = sentences.slice(1, -1).filter(s => 
-      s.toLowerCase().includes('important') || 
-      s.toLowerCase().includes('key') || 
-      s.toLowerCase().includes('note')
-    );
-    
-    return [firstSentence, ...keyPoints.slice(0, 2), lastSentence].join('. ') + '.';
-  }
-
-  private summarizeKnowledgeBase(knowledge: KnowledgeContext[], request: ContextOptimizationRequest): {summarized: KnowledgeContext[], optimizations: AppliedOptimization[]} {
-    const summarized = knowledge.map(kb => {
-      const summary = this.createKnowledgeSummary(kb);
-      return { ...kb, content: summary, tokenCount: Math.ceil(summary.length / 4) };
-    });
-
-    const tokensSaved = knowledge.reduce((sum, kb) => sum + kb.tokenCount, 0) - 
-                      summarized.reduce((sum, kb) => sum + kb.tokenCount, 0);
-
-    const optimizations: AppliedOptimization[] = [{
-      type: 'summarization',
-      description: 'Summarized knowledge base content',
-      tokensAffected: tokensSaved,
-      qualityImpact: 0.12,
-      metadata: { itemsSummarized: summarized.length, method: 'content_abstraction' }
-    }];
-
-    return { summarized, optimizations };
-  }
-
-  private createKnowledgeSummary(kb: KnowledgeContext): string {
-    // Extract key facts and definitions
-    const sentences = kb.content.split(/[.!?]+/).filter(s => s.trim().length > 0);
-    
-    if (sentences.length === 0) return '';
-    if (sentences.length === 1) return sentences[0].trim();
-    
-    // Prioritize sentences with key terms
-    const keyTerms = ['definition', 'definition:', 'is', 'are', 'means', 'refers to', 'defined as'];
-    const prioritySentences = sentences.filter(s => 
-      keyTerms.some(term => s.toLowerCase().includes(term))
-    );
-    
-    if (prioritySentences.length > 0) {
-      return prioritySentences[0].trim();
-    }
-    
-    return sentences[0].trim(); // Fallback to first sentence
-  }
-
-  private filterByRelevance<T extends { id: string; relevanceScore?: number; qualityScore?: number }>(
-    items: T[],
-    relevanceResults: RelevanceScoringResult[],
-    threshold: number
-  ): {filtered: T[], optimizations: AppliedOptimization[]} {
-    const thresholdResults = relevanceResults.filter(r => r.finalScore >= threshold);
-    const filteredIds = new Set(thresholdResults.map(r => r.itemId));
-    
-    const filtered = items.filter(item => filteredIds.has(item.id));
-    const removed = items.length - filtered.length;
-    const tokensAffected = items
-      .filter(item => !filteredIds.has(item.id))
-      .reduce((sum, item) => sum + (item as any).tokenCount || 0, 0);
-
-    const optimizations: AppliedOptimization[] = [{
-      type: 'filtering',
-      description: `Filtered ${removed} low-relevance items (threshold: ${threshold})`,
-      tokensAffected,
-      qualityImpact: 0.05,
-      metadata: { itemsRemoved: removed, threshold, averageScore: thresholdResults.reduce((sum, r) => sum + r.finalScore, 0) / thresholdResults.length }
-    }];
-
-    return { filtered, optimizations };
-  }
-
-  private defineContextHierarchy(request: ContextOptimizationRequest): {levels: Array<{name: string, action: 'preserve' | 'compress' | 'summarize' | 'remove', criteria: any}>} {
-    return {
-      levels: [
-        { name: 'critical', action: 'preserve', criteria: { contextValue: 'critical', qualityScore: 0.9 } },
-        { name: 'recent_important', action: 'preserve', criteria: { recency: '2_hours', contextValue: 'important' } },
-        { name: 'user_profile', action: 'compress', criteria: { type: 'profile' } },
-        { name: 'conversation_recent', action: 'summarize', criteria: { type: 'conversation', recency: '1_day' } },
-        { name: 'knowledge_high_rel', action: 'compress', criteria: { type: 'knowledge', reliability: 0.8 } },
-        { name: 'conversation_old', action: 'remove', criteria: { type: 'conversation', recency: '1_week' } },
-        { name: 'knowledge_low_rel', action: 'remove', criteria: { type: 'knowledge', reliability: 0.5 } },
-        { name: 'external_low_val', action: 'remove', criteria: { type: 'external', contextValue: 'supplementary' } }
-      ]
-    };
-  }
-
-  private compressContextLevel(context: OptimizableContext, level: any, request: ContextOptimizationRequest): {context: OptimizableContext, optimizations: AppliedOptimization[]} {
-    // Implementation for compressing specific context levels
-    return { context, optimizations: [] };
-  }
-
-  private summarizeContextLevel(context: OptimizableContext, level: any, request: ContextOptimizationRequest): {context: OptimizableContext, optimizations: AppliedOptimization[]} {
-    // Implementation for summarizing specific context levels
-    return { context, optimizations: [] };
-  }
-
-  private removeContextLevel(context: OptimizableContext, level: any, request: ContextOptimizationRequest): {context: OptimizableContext, optimizations: AppliedOptimization[]} {
-    // Implementation for removing specific context levels
-    return { context, optimizations: [] };
-  }
-
-  // Relevance scoring implementations
-  private scoreConversationRelevance(conv: ConversationContext, query?: string, userId?: string): RelevanceScoringResult {
-    const factors: RelevanceFactor[] = [];
-    let finalScore = 0.5;
-
-    // Recency factor
-    const hoursAgo = (Date.now() - conv.timestamp.getTime()) / (1000 * 60 * 60);
-    const recencyScore = Math.max(0.1, 1 - (hoursAgo / 24));
-    factors.push({
-      factor: 'recency',
-      weight: ContextOptimizer.RELEVANCE_WEIGHTS.recency,
-      score: recencyScore,
-      explanation: `Conversation from ${hoursAgo.toFixed(1)} hours ago`
-    });
-
-    // Quality factor
-    const qualityScore = conv.qualityScore || 0.5;
-    factors.push({
-      factor: 'quality',
-      weight: ContextOptimizer.RELEVANCE_WEIGHTS.quality,
-      score: qualityScore,
-      explanation: `Quality score: ${qualityScore.toFixed(2)}`
-    });
-
-    // Relevance to query
-    if (query) {
-      const queryRelevance = this.calculateTextRelevance(conv.content, query);
-      factors.push({
-        factor: 'relevance',
-        weight: ContextOptimizer.RELEVANCE_WEIGHTS.relevance,
-        score: queryRelevance,
-        explanation: `Query relevance: ${queryRelevance.toFixed(2)}`
-      });
-    } else {
-      const defaultRelevance = 0.5;
-      factors.push({
-        factor: 'relevance',
-        weight: ContextOptimizer.RELEVANCE_WEIGHTS.relevance,
-        score: defaultRelevance,
-        explanation: 'Default relevance (no query provided)'
-      });
-    }
-
-    // Importance factor
-    const importanceScores = { 'critical': 1.0, 'important': 0.8, 'contextual': 0.6, 'supplementary': 0.4 };
-    const importanceScore = importanceScores[conv.contextValue] || 0.6;
-    factors.push({
-      factor: 'importance',
-      weight: ContextOptimizer.RELEVANCE_WEIGHTS.importance,
-      score: importanceScore,
-      explanation: `Importance level: ${conv.contextValue}`
-    });
-
-    // Calculate final score
-    for (const factor of factors) {
-      finalScore += factor.weight * factor.score;
-    }
-    finalScore = Math.min(1.0, Math.max(0.0, finalScore));
-
-    return {
-      itemId: conv.id,
-      itemType: 'conversation',
-      relevanceScore: conv.relevanceScore || 0.5,
-      factors,
-      finalScore,
-      reason: `Conversation relevance based on ${factors.length} factors`
-    };
-  }
-
-  private scoreKnowledgeRelevance(kb: KnowledgeContext, query?: string, userId?: string): RelevanceScoringResult {
-    const factors: RelevanceFactor[] = [];
-    let finalScore = 0.5;
-
-    // Reliability factor
-    factors.push({
-      factor: 'quality',
-      weight: ContextOptimizer.RELEVANCE_WEIGHTS.quality,
-      score: kb.reliability,
-      explanation: `Source reliability: ${kb.reliability.toFixed(2)}`
-    });
-
-    // Relevance to query
-    if (query) {
-      const queryRelevance = this.calculateTextRelevance(kb.content, query);
-      factors.push({
-        factor: 'relevance',
-        weight: ContextOptimizer.RELEVANCE_WEIGHTS.relevance,
-        score: queryRelevance,
-        explanation: `Query relevance: ${queryRelevance.toFixed(2)}`
-      });
-    } else {
-      const defaultRelevance = 0.5;
-      factors.push({
-        factor: 'relevance',
-        weight: ContextOptimizer.RELEVANCE_WEIGHTS.relevance,
-        score: defaultRelevance,
-        explanation: 'Default relevance (no query provided)'
-      });
-    }
-
-    // Knowledge base relevance
-    factors.push({
-      factor: 'relevance',
-      weight: ContextOptimizer.RELEVANCE_WEIGHTS.relevance * 0.5,
-      score: kb.relevanceScore,
-      explanation: `Pre-calculated relevance: ${kb.relevanceScore.toFixed(2)}`
-    });
-
-    // Verification status
-    const verificationScore = kb.verificationStatus === 'verified' ? 1.0 : 
-                              kb.verificationStatus === 'pending' ? 0.6 : 0.3;
-    factors.push({
-      factor: 'quality',
-      weight: ContextOptimizer.RELEVANCE_WEIGHTS.quality * 0.5,
-      score: verificationScore,
-      explanation: `Verification status: ${kb.verificationStatus}`
-    });
-
-    // Calculate final score
-    for (const factor of factors) {
-      finalScore += factor.weight * factor.score;
-    }
-    finalScore = Math.min(1.0, Math.max(0.0, finalScore));
-
-    return {
-      itemId: kb.id,
-      itemType: 'knowledge',
-      relevanceScore: kb.relevanceScore,
-      factors,
-      finalScore,
-      reason: `Knowledge relevance based on ${factors.length} factors`
-    };
-  }
-
-  private scoreProfileRelevance(profile: UserProfileContext, query?: string, userId?: string): RelevanceScoringResult {
-    const factors: RelevanceFactor[] = [];
-    let finalScore = 0.7; // Base score for profile
-
-    // Query relevance to subjects
-    if (query) {
-      const subjectRelevance = this.calculateListRelevance(profile.subjects, query);
-      factors.push({
-        factor: 'relevance',
-        weight: ContextOptimizer.RELEVANCE_WEIGHTS.relevance,
-        score: subjectRelevance,
-        explanation: `Subject relevance: ${subjectRelevance.toFixed(2)}`
-      });
-    }
-
-    // Learning style match
-    factors.push({
-      factor: 'importance',
-      weight: ContextOptimizer.RELEVANCE_WEIGHTS.importance,
-      score: 0.8,
-      explanation: 'User profile always important'
-    });
-
-    // Calculate final score
-    for (const factor of factors) {
-      finalScore += factor.weight * factor.score;
-    }
-    finalScore = Math.min(1.0, Math.max(0.0, finalScore));
-
-    return {
-      itemId: profile.id,
-      itemType: 'profile',
-      relevanceScore: 0.8,
-      factors,
-      finalScore,
-      reason: 'User profile relevance'
-    };
-  }
-
-  private scoreExternalRelevance(ext: ExternalContext, query?: string, userId?: string): RelevanceScoringResult {
-    const factors: RelevanceFactor[] = [];
-    let finalScore = 0.6; // Base score for external sources
-
-    // Reliability factor
-    factors.push({
-      factor: 'quality',
-      weight: ContextOptimizer.RELEVANCE_WEIGHTS.quality,
-      score: ext.reliability,
-      explanation: `External source reliability: ${ext.reliability.toFixed(2)}`
-    });
-
-    // Context value
-    const valueScores = { 'critical': 1.0, 'important': 0.8, 'contextual': 0.6 };
-    const valueScore = valueScores[ext.contextValue] || 0.6;
-    factors.push({
-      factor: 'importance',
-      weight: ContextOptimizer.RELEVANCE_WEIGHTS.importance,
-      score: valueScore,
-      explanation: `Context value: ${ext.contextValue}`
-    });
-
-    // Calculate final score
-    for (const factor of factors) {
-      finalScore += factor.weight * factor.score;
-    }
-    finalScore = Math.min(1.0, Math.max(0.0, finalScore));
-
-    return {
-      itemId: ext.source,
-      itemType: 'external',
-      relevanceScore: 0.6,
-      factors,
-      finalScore,
-      reason: `External source relevance based on ${factors.length} factors`
-    };
-  }
-
-  private scoreSystemRelevance(system: SystemContext, query?: string, userId?: string): RelevanceScoringResult {
-    const factors: RelevanceFactor[] = [];
-    let finalScore = 0.5; // Base score for system context
-
-    // System status importance
-    if (system.systemStatus.status !== 'operational') {
-      factors.push({
-        factor: 'importance',
-        weight: ContextOptimizer.RELEVANCE_WEIGHTS.importance,
-        score: 0.9,
-        explanation: 'Non-operational system status requires attention'
-      });
-      finalScore = 0.8;
-    } else {
-      factors.push({
-        factor: 'importance',
-        weight: ContextOptimizer.RELEVANCE_WEIGHTS.importance,
-        score: 0.6,
-        explanation: 'System operational'
-      });
+    if (!request.strategy) {
+      errors.push('Optimization strategy is required');
     }
 
     return {
-      itemId: 'system_context',
-      itemType: 'system',
-      relevanceScore: 0.5,
-      factors,
-      finalScore,
-      reason: 'System context relevance'
+      isValid: errors.length === 0,
+      errors
     };
   }
 
-  // Utility methods
-  private calculateTextRelevance(text: string, query: string): number {
-    const textWords = new Set(text.toLowerCase().split(/\W+/).filter(w => w.length > 2));
-    const queryWords = query.toLowerCase().split(/\W+/).filter(w => w.length > 2);
+  private calculateTokenBudget(request: OptimizationRequest): TokenBudget {
+    const total = request.tokenLimit;
+    const components: ContextComponent[] = ['profile', 'knowledge', 'memory', 'sources', 'history'];
+    const allocated: Record<ContextComponent, number> = {} as any;
     
-    if (queryWords.length === 0) return 0.5;
-    
-    const matches = queryWords.filter(word => textWords.has(word)).length;
-    return matches / queryWords.length;
-  }
-
-  private calculateListRelevance(list: string[], query: string): number {
-    if (list.length === 0) return 0;
-    
-    const matches = list.filter(item => 
-      item.toLowerCase().includes(query.toLowerCase()) ||
-      query.toLowerCase().includes(item.toLowerCase())
-    ).length;
-    
-    return matches / list.length;
-  }
-
-  // Token budget allocation methods
-  private allocateStrictBudget(context: OptimizableContext, totalBudget: number): TokenBudgetAllocation[] {
-    const allocations: TokenBudgetAllocation[] = [];
-
-    // Fixed allocation percentages
-    const allocations_pct = {
-      userProfile: 0.15,
-      conversation: 0.40,
-      knowledge: 0.30,
-      external: 0.10,
-      system: 0.05
+    // Default allocation based on importance for study sessions
+    const defaultAllocation = {
+      profile: 0.15,    // 15% - Critical for personalization
+      knowledge: 0.40,  // 40% - Most important for learning
+      memory: 0.20,     // 20% - Important for continuity
+      sources: 0.15,    // 15% - Supporting information
+      history: 0.10     // 10% - Contextual information
     };
 
-    for (const [category, percentage] of Object.entries(allocations_pct)) {
-      const allocated = Math.floor(totalBudget * percentage);
-      allocations.push({
-        category,
-        allocated,
-        used: 0,
-        remaining: allocated,
-        priority: this.getCategoryPriority(category),
-        isFlexible: false
-      });
+    // Adjust allocation based on strategy
+    let strategyAdjustment = 1.0;
+    if (request.strategy === 'size_reducing') {
+      strategyAdjustment = 0.8; // Reduce overall allocation
+    } else if (request.strategy === 'quality_preserving') {
+      strategyAdjustment = 1.1; // Increase overall allocation
     }
 
-    return allocations;
+    for (const component of components) {
+      const baseAllocation = (defaultAllocation as any)[component] * total * strategyAdjustment;
+      allocated[component] = Math.floor(baseAllocation);
+    }
+
+    const allocatedSum = Object.values(allocated).reduce((sum, val) => sum + val, 0);
+    const remaining = total - allocatedSum;
+
+    return {
+      total,
+      allocated,
+      remaining: Math.max(0, remaining),
+      efficiency: allocatedSum / total
+    };
   }
 
-  private allocateFlexibleBudget(context: OptimizableContext, totalBudget: number): TokenBudgetAllocation[] {
-    const allocations: TokenBudgetAllocation[] = [];
+  private compressProfile(profile: any, targetTokens: number): { compressed: any; tokenCount: number; informationLoss: number; qualityImpact: number } {
+    const originalTokens = this.estimateTokens(JSON.stringify(profile));
     
-    // Start with adaptive allocation
-    const baseAllocations = this.allocateAdaptiveBudget(context, totalBudget);
+    if (originalTokens <= targetTokens) {
+      return { compressed: profile, tokenCount: originalTokens, informationLoss: 0, qualityImpact: 0 };
+    }
+
+    // Compress by removing less important fields
+    const compressed = {
+      ...profile,
+      compressedMetadata: profile.compressedMetadata ? {
+        totalSessions: profile.compressedMetadata.totalSessions,
+        mostStudiedSubject: profile.compressedMetadata.mostStudiedSubject,
+        learningVelocity: profile.compressedMetadata.learningVelocity
+      } : {},
+      recentTopics: profile.recentTopics?.slice(0, 5) || []
+    };
+
+    const newTokens = this.estimateTokens(JSON.stringify(compressed));
+    const informationLoss = (originalTokens - newTokens) / originalTokens;
     
-    // Mark all as flexible
-    return baseAllocations.map(alloc => ({
-      ...alloc,
-      isFlexible: true
+    return {
+      compressed,
+      tokenCount: newTokens,
+      informationLoss,
+      qualityImpact: informationLoss * 0.2 // Profile compression has low quality impact
+    };
+  }
+
+  private async compressKnowledgeBase(knowledge: any[], targetTokens: number, strategy: string): Promise<{ compressed: any[]; tokenCount: number; informationLoss: number; qualityImpact: number }> {
+    const originalTokens = knowledge.reduce((sum, entry) => sum + this.estimateTokens(entry.content), 0);
+    
+    if (originalTokens <= targetTokens) {
+      return { compressed: knowledge, tokenCount: originalTokens, informationLoss: 0, qualityImpact: 0 };
+    }
+
+    // Sort by educational value and confidence
+    const sorted = [...knowledge].sort((a, b) => {
+      const scoreA = (a.educationalValue || 0) * 0.6 + (a.confidence || 0) * 0.4;
+      const scoreB = (b.educationalValue || 0) * 0.6 + (b.confidence || 0) * 0.4;
+      return scoreB - scoreA;
+    });
+
+    const compressionRatios = {
+      quality_preserving: 0.3,
+      size_reducing: 0.7,
+      balanced: 0.5,
+      performance_oriented: 0.4
+    };
+
+    const targetCount = Math.max(1, Math.floor(sorted.length * (1 - (compressionRatios as any)[strategy] || 0.5)));
+    const compressed = sorted.slice(0, targetCount).map(entry => ({
+      ...entry,
+      content: this.compressText(entry.content, 0.7),
+      relatedConcepts: entry.relatedConcepts?.slice(0, 3) || []
     }));
-  }
 
-  private allocateAdaptiveBudget(context: OptimizableContext, totalBudget: number): TokenBudgetAllocation[] {
-    const allocations: TokenBudgetAllocation[] = [];
+    const newTokens = compressed.reduce((sum, entry) => sum + this.estimateTokens(entry.content), 0);
+    const informationLoss = Math.max(0, (originalTokens - newTokens) / originalTokens);
     
-    // Calculate actual usage
-    const actualUsage = {
-      userProfile: context.userProfile?.totalTokens || 0,
-      conversation: context.conversationHistory?.reduce((sum, conv) => sum + conv.tokenCount, 0) || 0,
-      knowledge: context.knowledgeBase?.reduce((sum, kb) => sum + kb.tokenCount, 0) || 0,
-      external: context.externalSources?.reduce((sum, ext) => sum + ext.tokenCount, 0) || 0,
-      system: context.systemContext?.tokenCount || 0
-    };
-
-    const totalActual = Object.values(actualUsage).reduce((sum, usage) => sum + usage, 0);
-    
-    // Allocate proportionally to actual usage, but ensure minimums
-    for (const [category, usage] of Object.entries(actualUsage)) {
-      const proportion = totalActual > 0 ? usage / totalActual : 0.2;
-      const allocated = Math.max(Math.floor(totalBudget * Math.max(proportion, 0.1)), 100); // Minimum 100 tokens
-      
-      allocations.push({
-        category,
-        allocated,
-        used: usage,
-        remaining: Math.max(0, allocated - usage),
-        priority: this.getCategoryPriority(category),
-        isFlexible: proportion < 0.1 // Mark as flexible if below minimum
-      });
-    }
-
-    return allocations;
-  }
-
-  private allocatePriorityBasedBudget(context: OptimizableContext, totalBudget: number): TokenBudgetAllocation[] {
-    const allocations: TokenBudgetAllocation[] = [];
-    
-    // Calculate relevance scores for prioritization
-    const relevanceResults = this.calculateRelevanceScores(context, 'system'); // system user for calculation
-    
-    // Group by category and calculate average relevance
-    const categoryRelevance: Record<string, {relevance: number, count: number}> = {};
-    
-    for (const result of relevanceResults) {
-      const category = this.getCategoryFromItemType(result.itemType);
-      if (!categoryRelevance[category]) {
-        categoryRelevance[category] = { relevance: 0, count: 0 };
-      }
-      categoryRelevance[category].relevance += result.finalScore;
-      categoryRelevance[category].count += 1;
-    }
-
-    // Calculate relevance-weighted allocations
-    const totalRelevance = Object.values(categoryRelevance).reduce((sum, cat) => sum + (cat.relevance / Math.max(cat.count, 1)), 0);
-    
-    for (const [category, data] of Object.entries(categoryRelevance)) {
-      const avgRelevance = data.relevance / Math.max(data.count, 1);
-      const weight = totalRelevance > 0 ? avgRelevance / totalRelevance : 0.2;
-      const allocated = Math.floor(totalBudget * weight);
-      
-      allocations.push({
-        category,
-        allocated,
-        used: 0, // Will be filled by actual usage
-        remaining: allocated,
-        priority: Math.floor(avgRelevance * 10), // Convert to 1-10 scale
-        isFlexible: true
-      });
-    }
-
-    return allocations;
-  }
-
-  private getCategoryPriority(category: string): number {
-    const priorities = {
-      userProfile: 9,
-      conversation: 8,
-      knowledge: 7,
-      external: 5,
-      system: 3
-    };
-    return priorities[category as keyof typeof priorities] || 5;
-  }
-
-  private getCategoryFromItemType(itemType: string): string {
-    const mapping = {
-      'profile': 'userProfile',
-      'conversation': 'conversation',
-      'knowledge': 'knowledge',
-      'external': 'external',
-      'system': 'system'
-    };
-    return mapping[itemType as keyof typeof mapping] || 'unknown';
-  }
-
-  private createDefaultAllocations(context: OptimizableContext, totalBudget: number): TokenBudgetAllocation[] {
-    return [
-      { category: 'userProfile', allocated: Math.floor(totalBudget * 0.2), used: 0, remaining: Math.floor(totalBudget * 0.2), priority: 8, isFlexible: true },
-      { category: 'conversation', allocated: Math.floor(totalBudget * 0.4), used: 0, remaining: Math.floor(totalBudget * 0.4), priority: 7, isFlexible: true },
-      { category: 'knowledge', allocated: Math.floor(totalBudget * 0.3), used: 0, remaining: Math.floor(totalBudget * 0.3), priority: 6, isFlexible: true },
-      { category: 'external', allocated: Math.floor(totalBudget * 0.1), used: 0, remaining: Math.floor(totalBudget * 0.1), priority: 4, isFlexible: true }
-    ];
-  }
-
-  // Dynamic adjustment methods
-  private evaluateStrategyPerformance(
-    strategies: OptimizationStrategy[],
-    adjustmentNeeded: number,
-    qualityRequirement: number,
-    timeConstraint: number
-  ): {bestStrategy?: OptimizationStrategy, confidence: number, estimatedQuality: number} {
-    // Simple heuristic evaluation
-    let bestStrategy: OptimizationStrategy | undefined;
-    let bestScore = 0;
-    let confidence = 0.5;
-    let estimatedQuality = 0.7;
-
-    for (const strategy of strategies) {
-      let score = 0;
-
-      // Token reduction capability
-      const reductionCapability = this.getStrategyReductionCapability(strategy);
-      if (reductionCapability >= adjustmentNeeded) {
-        score += 0.4;
-      } else {
-        score += (reductionCapability / adjustmentNeeded) * 0.4;
-      }
-
-      // Quality retention
-      const qualityRetention = this.getStrategyQualityRetention(strategy);
-      if (qualityRetention >= qualityRequirement) {
-        score += 0.3;
-      } else {
-        score += (qualityRetention / qualityRequirement) * 0.3;
-      }
-
-      // Speed (inverse of time constraint)
-      const speed = this.getStrategySpeed(strategy);
-      if (speed <= timeConstraint) {
-        score += 0.3;
-      } else {
-        score += Math.max(0, (timeConstraint / speed)) * 0.3;
-      }
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestStrategy = strategy;
-        confidence = Math.min(0.9, score);
-        estimatedQuality = qualityRetention;
-      }
-    }
-
-    return { bestStrategy, confidence, estimatedQuality };
-  }
-
-  private getStrategyReductionCapability(strategy: OptimizationStrategy): number {
-    const capabilities = {
-      'compression': 0.2,
-      'truncation': 0.5,
-      'summarization': 0.4,
-      'relevance_filtering': 0.6,
-      'hierarchical': 0.7
-    };
-    return capabilities[strategy] || 0.3;
-  }
-
-  private getStrategyQualityRetention(strategy: OptimizationStrategy): number {
-    const retention = {
-      'compression': 0.95,
-      'truncation': 0.8,
-      'summarization': 0.85,
-      'relevance_filtering': 0.9,
-      'hierarchical': 0.88
-    };
-    return retention[strategy] || 0.85;
-  }
-
-  private getStrategySpeed(strategy: OptimizationStrategy): number {
-    const speeds = {
-      'compression': 100,
-      'truncation': 50,
-      'summarization': 200,
-      'relevance_filtering': 150,
-      'hierarchical': 300
-    };
-    return speeds[strategy] || 150; // milliseconds
-  }
-
-  private estimateTokenReduction(strategy: OptimizationStrategy, currentTokens: number, qualityRequirement: number): number {
-    const baseReduction = this.getStrategyReductionCapability(strategy) * currentTokens;
-    const qualityAdjustment = qualityRequirement < 0.8 ? 0.8 : 1.0; // Reduce if low quality required
-    return Math.floor(baseReduction * qualityAdjustment);
-  }
-
-  // Quality retention calculation
-  private calculateQualityRetention(
-    original: OptimizableContext,
-    optimized: OptimizableContext,
-    request: ContextOptimizationRequest
-  ): ContextOptimizationResult['qualityMetrics'] {
-    // Calculate relevance retention
-    const originalRelevance = this.calculateContextRelevance(original);
-    const optimizedRelevance = this.calculateContextRelevance(optimized);
-    const relevanceRetention = originalRelevance > 0 ? optimizedRelevance / originalRelevance : 1.0;
-
-    // Calculate completeness retention
-    const originalCompleteness = this.calculateContextCompleteness(original);
-    const optimizedCompleteness = this.calculateContextCompleteness(optimized);
-    const completenessRetention = originalCompleteness > 0 ? optimizedCompleteness / originalCompleteness : 1.0;
-
-    // Check if critical info is preserved
-    const criticalInfoPreserved = this.checkCriticalInfoPreserved(original, optimized);
-
-    // Check if recent info is preserved
-    const recentInfoPreserved = this.checkRecentInfoPreserved(original, optimized);
-
     return {
-      relevanceRetention,
-      completenessRetention,
-      criticalInfoPreserved,
-      recentInfoPreserved
+      compressed,
+      tokenCount: newTokens,
+      informationLoss,
+      qualityImpact: informationLoss * 0.5 // Knowledge compression has moderate quality impact
     };
   }
 
-  private calculateContextRelevance(context: OptimizableContext): number {
-    let totalRelevance = 0;
-    let count = 0;
-
-    if (context.conversationHistory) {
-      for (const conv of context.conversationHistory) {
-        totalRelevance += conv.relevanceScore || 0.5;
-        count++;
-      }
+  private compressConversationHistory(history: any[], targetTokens: number): { compressed: any[]; tokenCount: number; informationLoss: number; qualityImpact: number } {
+    const originalTokens = history.reduce((sum, summary) => sum + this.estimateTokens(summary.summary), 0);
+    
+    if (originalTokens <= targetTokens) {
+      return { compressed: history, tokenCount: originalTokens, informationLoss: 0, qualityImpact: 0 };
     }
 
-    if (context.knowledgeBase) {
-      for (const kb of context.knowledgeBase) {
-        totalRelevance += kb.relevanceScore || 0.5;
-        count++;
-      }
-    }
+    // Sort by quality score and recency
+    const sorted = [...history].sort((a, b) => {
+      const scoreA = (a.qualityScore || 0) * 0.7 + (1 / (Date.now() - new Date(a.createdAt).getTime())) * 0.3;
+      const scoreB = (b.qualityScore || 0) * 0.7 + (1 / (Date.now() - new Date(b.createdAt).getTime())) * 0.3;
+      return scoreB - scoreA;
+    });
 
-    return count > 0 ? totalRelevance / count : 0.5;
+    const targetCount = Math.max(1, Math.floor(sorted.length * 0.6)); // Keep 60% of history
+    const compressed = sorted.slice(0, targetCount).map(summary => ({
+      ...summary,
+      summary: this.compressText(summary.summary, 0.6),
+      keyTopics: summary.keyTopics?.slice(0, 3) || []
+    }));
+
+    const newTokens = compressed.reduce((sum, summary) => sum + this.estimateTokens(summary.summary), 0);
+    const informationLoss = Math.max(0, (originalTokens - newTokens) / originalTokens);
+    
+    return {
+      compressed,
+      tokenCount: newTokens,
+      informationLoss,
+      qualityImpact: informationLoss * 0.4 // History compression has moderate quality impact
+    };
   }
 
-  private calculateContextCompleteness(context: OptimizableContext): number {
-    const originalTotal = this.countTotalTokens(request?.originalContext || context);
-    const currentTotal = this.countTotalTokens(context);
-    return originalTotal > 0 ? currentTotal / originalTotal : 1.0;
-  }
-
-  private checkCriticalInfoPreserved(original: OptimizableContext, optimized: OptimizableContext): boolean {
-    // Check if critical conversation items are preserved
-    if (original.conversationHistory && optimized.conversationHistory) {
-      const originalCritical = original.conversationHistory.filter(conv => conv.contextValue === 'critical');
-      const optimizedCritical = optimized.conversationHistory.filter(conv => conv.contextValue === 'critical');
-      if (originalCritical.length > 0 && optimizedCritical.length < originalCritical.length) {
-        return false;
-      }
+  private compressSources(sources: any[], targetTokens: number): { compressed: any[]; tokenCount: number; informationLoss: number; qualityImpact: number } {
+    const originalTokens = sources.reduce((sum, source) => sum + this.estimateTokens(source.content), 0);
+    
+    if (originalTokens <= targetTokens) {
+      return { compressed: sources, tokenCount: originalTokens, informationLoss: 0, qualityImpact: 0 };
     }
 
-    // Check if high-reliability knowledge is preserved
-    if (original.knowledgeBase && optimized.knowledgeBase) {
-      const originalHighRel = original.knowledgeBase.filter(kb => kb.reliability > 0.8);
-      const optimizedHighRel = optimized.knowledgeBase.filter(kb => kb.reliability > 0.8);
-      if (originalHighRel.length > 0 && optimizedHighRel.length < originalHighRel.length) {
-        return false;
-      }
-    }
+    // Sort by educational relevance and reliability
+    const sorted = [...sources].sort((a, b) => {
+      const scoreA = (a.educationalRelevance || 0) * 0.6 + (a.reliability || 0) * 0.4;
+      const scoreB = (b.educationalRelevance || 0) * 0.6 + (b.reliability || 0) * 0.4;
+      return scoreB - scoreA;
+    });
 
-    return true;
+    const targetCount = Math.max(1, Math.floor(sorted.length * 0.5)); // Keep 50% of sources
+    const compressed = sorted.slice(0, targetCount).map(source => ({
+      ...source,
+      content: this.compressText(source.content, 0.8),
+      topics: source.topics?.slice(0, 2) || []
+    }));
+
+    const newTokens = compressed.reduce((sum, source) => sum + this.estimateTokens(source.content), 0);
+    const informationLoss = Math.max(0, (originalTokens - newTokens) / originalTokens);
+    
+    return {
+      compressed,
+      tokenCount: newTokens,
+      informationLoss,
+      qualityImpact: informationLoss * 0.3 // Sources compression has low quality impact
+    };
   }
 
-  private checkRecentInfoPreserved(original: OptimizableContext, optimized: OptimizableContext): boolean {
-    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-
-    if (original.conversationHistory && optimized.conversationHistory) {
-      const originalRecent = original.conversationHistory.filter(conv => conv.timestamp > twoHoursAgo);
-      const optimizedRecent = optimized.conversationHistory.filter(conv => conv.timestamp > twoHoursAgo);
-      if (originalRecent.length > 0 && optimizedRecent.length < originalRecent.length * 0.8) {
-        return false;
-      }
-    }
-
-    return true;
+  private calculateTokenUsage(context: EnhancedContext): any {
+    const profileTokens = this.estimateTokens(JSON.stringify(context.studentProfile));
+    const knowledgeTokens = context.knowledgeBase.reduce((sum, entry) => sum + this.estimateTokens(entry.content), 0);
+    const historyTokens = context.conversationHistory.reduce((sum, summary) => sum + this.estimateTokens(summary.summary), 0);
+    const sourcesTokens = context.externalSources.reduce((sum, source) => sum + this.estimateTokens(source.content), 0);
+    
+    const total = profileTokens + knowledgeTokens + historyTokens + sourcesTokens;
+    
+    return {
+      total,
+      profile: profileTokens,
+      knowledge: knowledgeTokens,
+      history: historyTokens,
+      sources: sourcesTokens,
+      remaining: Math.max(0, ContextOptimizer.DEFAULT_TOKEN_LIMIT - total)
+    };
   }
 
-  private generateOptimizationRecommendations(
-    request: ContextOptimizationRequest,
-    optimizations: AppliedOptimization[],
-    qualityMetrics: ContextOptimizationResult['qualityMetrics']
-  ): string[] {
+  private calculateQualityScore(context: EnhancedContext, request: OptimizationRequest): number {
+    let score = 1.0;
+
+    // Penalize based on token reduction ratio
+    const reductionRatio = 1 - (context.tokenUsage.total / request.context.tokenUsage.total);
+    score -= reductionRatio * 0.3;
+
+    // Adjust based on strategy
+    if (request.strategy === 'quality_preserving') {
+      score = Math.max(score, 0.8);
+    } else if (request.strategy === 'size_reducing') {
+      score = Math.max(score, 0.6);
+    }
+
+    return Math.max(0, Math.min(1, score));
+  }
+
+  private extractPreservedInformation(context: EnhancedContext, request: OptimizationRequest): PreservedInformation {
+    return {
+      criticalFacts: context.knowledgeBase
+        .filter(entry => entry.educationalValue > 0.8)
+        .map(entry => entry.content.substring(0, 100) + '...'),
+      learningObjectives: context.studentProfile.learningObjectives || [],
+      studentPreferences: {
+        learningStyle: context.studentProfile.learningStyle?.type,
+        difficulty: context.studentProfile.preferredComplexity?.current,
+        subjects: context.studentProfile.strongSubjects
+      },
+      recentProgress: context.studentProfile.lastSessionSummary,
+      knowledgeGaps: this.identifyKnowledgeGaps(context)
+    };
+  }
+
+  private identifyKnowledgeGaps(context: EnhancedContext): string[] {
+    // Simple heuristic to identify potential knowledge gaps
+    const gaps: string[] = [];
+    
+    if (context.knowledgeBase.length < 5) {
+      gaps.push('Limited knowledge base coverage');
+    }
+    
+    if (context.studentProfile.weakSubjects?.length > 0) {
+      gaps.push(`Weak subjects: ${context.studentProfile.weakSubjects.join(', ')}`);
+    }
+    
+    return gaps;
+  }
+
+  private generateOptimizationRecommendations(context: EnhancedContext, request: OptimizationRequest, details: OptimizationDetails): string[] {
     const recommendations: string[] = [];
 
-    // Strategy-specific recommendations
-    switch (request.optimizationStrategy) {
-      case 'compression':
-        recommendations.push('Consider adjusting compression level based on quality requirements');
-        break;
-      case 'truncation':
-        recommendations.push('Monitor impact on conversation flow after truncation');
-        break;
-      case 'summarization':
-        recommendations.push('Verify that key information is preserved in summaries');
-        break;
-      case 'relevance_filtering':
-        recommendations.push('Fine-tune relevance threshold based on query types');
-        break;
-      case 'hierarchical':
-        recommendations.push('Review hierarchy levels for optimal context retention');
-        break;
+    if (details.optimizedTokenCount > request.tokenLimit * 0.9) {
+      recommendations.push('Consider further optimization to leave buffer space');
     }
 
-    // Quality-based recommendations
-    if (qualityMetrics.relevanceRetention < 0.8) {
-      recommendations.push('Consider reducing optimization intensity to maintain relevance');
+    if (details.tradeoffs.length > 2) {
+      recommendations.push('Multiple components were optimized - consider reviewing quality impact');
     }
 
-    if (!qualityMetrics.criticalInfoPreserved) {
-      recommendations.push('Adjust strategy to preserve critical information');
+    if (request.strategy === 'size_reducing' && details.optimizationDetails.qualityImpact < 0.7) {
+      recommendations.push('Quality may have been significantly impacted - consider quality-preserving strategy');
     }
 
-    if (!qualityMetrics.recentInfoPreserved) {
-      recommendations.push('Implement recent information preservation rules');
-    }
-
-    // Token budget recommendations
-    if (request.tokenBudgetStrategy === 'strict' && request.maxTokens < 1000) {
-      recommendations.push('Consider using adaptive token budget for better allocation');
+    if (context.knowledgeBase.length === 0) {
+      recommendations.push('No educational content available - consider expanding knowledge base');
     }
 
     return recommendations;
   }
 
-  private cacheOptimizationResult(result: ContextOptimizationResult): void {
-    const cacheKey = this.generateCacheKey(result);
-    this.optimizationCache.set(cacheKey, {
-      result,
-      timestamp: new Date(),
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+  private identifyOptimizedComponents(original: EnhancedContext, optimized: EnhancedContext): ContextComponent[] {
+    const components: ContextComponent[] = [];
+    
+    if (original.knowledgeBase.length !== optimized.knowledgeBase.length) {
+      components.push('knowledge');
+    }
+    
+    if (original.conversationHistory.length !== optimized.conversationHistory.length) {
+      components.push('history');
+    }
+    
+    if (original.externalSources.length !== optimized.externalSources.length) {
+      components.push('sources');
+    }
+    
+    return components;
+  }
+
+  private getComponentTokenSize(context: EnhancedContext, component: ContextComponent): number {
+    switch (component) {
+      case 'profile': return context.tokenUsage.profile;
+      case 'knowledge': return context.tokenUsage.knowledge;
+      case 'memory': return 0; // Not implemented yet
+      case 'sources': return context.tokenUsage.sources;
+      case 'history': return context.tokenUsage.history;
+      default: return 0;
+    }
+  }
+
+  private compressText(text: string, ratio: number): string {
+    if (ratio >= 1.0) return text;
+    
+    const sentences = text.split(/[.!?]+/);
+    const targetSentences = Math.max(1, Math.floor(sentences.length * ratio));
+    
+    return sentences
+      .slice(0, targetSentences)
+      .join('. ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private estimateTokens(text: string): number {
+    // Rough estimation: 1 token ≈ 4 characters for English text
+    return Math.ceil(text.length / 4);
+  }
+
+  private generateCacheKey(request: OptimizationRequest): string {
+    const keyData = {
+      contextHash: this.calculateContextHash(request.context),
+      tokenLimit: request.tokenLimit,
+      strategy: request.strategy,
+      preserveComponents: request.preserveComponents?.sort(),
+      minimumQuality: request.minimumQuality,
+      educationalPriority: request.educationalPriority
+    };
+    
+    return btoa(JSON.stringify(keyData)).replace(/[^a-zA-Z0-9]/g, '');
+  }
+
+  private calculateContextHash(context: EnhancedContext): string {
+    const hashData = {
+      profileSize: JSON.stringify(context.studentProfile).length,
+      knowledgeCount: context.knowledgeBase.length,
+      historyCount: context.conversationHistory.length,
+      sourcesCount: context.externalSources.length,
+      compressionLevel: context.compressionLevel
+    };
+    
+    return btoa(JSON.stringify(hashData)).replace(/[^a-zA-Z0-9]/g, '');
+  }
+
+  private initializeCompressionProfiles(): void {
+    this.compressionProfiles.set('profile', {
+      component: 'profile',
+      baseCompression: 0.1,
+      qualityWeight: 0.9,
+      educationalWeight: 0.8,
+      priority: 1,
+      maxCompression: 0.3
+    });
+
+    this.compressionProfiles.set('knowledge', {
+      component: 'knowledge',
+      baseCompression: 0.4,
+      qualityWeight: 0.7,
+      educationalWeight: 0.9,
+      priority: 2,
+      maxCompression: 0.7
+    });
+
+    this.compressionProfiles.set('memory', {
+      component: 'memory',
+      baseCompression: 0.3,
+      qualityWeight: 0.6,
+      educationalWeight: 0.7,
+      priority: 3,
+      maxCompression: 0.6
+    });
+
+    this.compressionProfiles.set('sources', {
+      component: 'sources',
+      baseCompression: 0.5,
+      qualityWeight: 0.4,
+      educationalWeight: 0.6,
+      priority: 4,
+      maxCompression: 0.8
+    });
+
+    this.compressionProfiles.set('history', {
+      component: 'history',
+      baseCompression: 0.4,
+      qualityWeight: 0.5,
+      educationalWeight: 0.5,
+      priority: 5,
+      maxCompression: 0.7
     });
   }
 
-  private generateCacheKey(result: ContextOptimizationResult): string {
-    const keyData = {
-      strategy: result.optimizationStrategy,
-      tokenBudget: result.tokenReduction.optimized,
-      originalTokens: result.tokenReduction.original,
-      contextHash: createHash('md5').update(JSON.stringify(result.originalContext)).digest('hex')
-    };
-    return createHash('md5').update(JSON.stringify(keyData) + this.cryptoKey).digest('hex');
-  }
-
-  private generateOptimizationId(): string {
-    return `opt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
   private startCacheCleanup(): void {
-    this.cacheCleanupInterval = setInterval(() => {
+    setInterval(() => {
       const now = new Date();
-      let cleaned = 0;
-
       for (const [key, cached] of this.optimizationCache.entries()) {
-        if (cached.expiresAt < now) {
+        if (cached.expiresAt <= now) {
           this.optimizationCache.delete(key);
-          cleaned++;
         }
       }
-
-      if (cleaned > 0) {
-        logInfo('Optimization cache cleanup completed', {
-          componentName: 'ContextOptimizer',
-          entriesRemoved: cleaned,
-          remainingEntries: this.optimizationCache.size
-        });
-      }
-    }, 5 * 60 * 1000); // Clean every 5 minutes
-  }
-
-  private async logOptimizationResult(request: ContextOptimizationRequest, result: ContextOptimizationResult): Promise<void> {
-    try {
-      // This would integrate with the existing logging system
-      logInfo('Context optimization result logged', {
-        componentName: 'ContextOptimizer',
-        optimizationId: result.optimizationId,
-        strategy: result.optimizationStrategy,
-        reductionRatio: result.tokenReduction.reductionRatio,
-        qualityRetention: result.qualityMetrics.relevanceRetention
-      });
-    } catch (error) {
-      logWarning('Failed to log optimization result', { error });
-    }
+    }, 60000); // Clean up every minute
   }
 
   /**
-   * Cleanup on instance destruction
+   * Clear all caches
    */
-  destroy(): void {
-    if (this.cacheCleanupInterval) {
-      clearInterval(this.cacheCleanupInterval);
-    }
+  clearCaches(): void {
     this.optimizationCache.clear();
-    this.tokenCounters.clear();
   }
 }
 
@@ -2005,14 +901,12 @@ export class ContextOptimizer {
 export const contextOptimizer = new ContextOptimizer();
 
 // Convenience functions
-export const optimizeContext = (request: ContextOptimizationRequest) => 
+export const optimizeContext = (request: OptimizationRequest) => 
   contextOptimizer.optimizeContext(request);
 
-export const allocateTokenBudget = (context: OptimizableContext, budget: number, strategy?: TokenBudgetStrategy) => 
-  contextOptimizer.allocateTokenBudget(context, budget, strategy);
-
-export const calculateRelevanceScores = (context: OptimizableContext, userId: string, query?: string) => 
-  contextOptimizer.calculateRelevanceScores(context, userId, query);
-
-export const adjustContextDynamically = (request: DynamicAdjustmentRequest) => 
-  contextOptimizer.adjustContextDynamically(request);
+export const getTokenBudget = (context: EnhancedContext, tokenLimit: number) => 
+  contextOptimizer.calculateTokenBudget({
+    context,
+    tokenLimit,
+    strategy: 'balanced'
+  });

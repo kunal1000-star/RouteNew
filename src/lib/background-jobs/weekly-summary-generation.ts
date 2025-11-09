@@ -2,7 +2,7 @@
 // =============================
 
 import { supabase } from '../supabase';
-import { aiServiceManager } from '../ai/ai-service-manager';
+import { aiServiceManager } from '../ai/ai-service-manager-unified';
 import type { AIServiceManagerRequest } from '@/types/ai-service-manager';
 import type { JobResult } from './scheduler';
 

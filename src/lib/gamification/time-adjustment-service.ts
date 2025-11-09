@@ -60,7 +60,9 @@ export async function calculateAndApplyTimeAdjustment(
   
   // Auto-adjust start time to current time + 1 minute
   const newStartTime = new Date(currentTime.getTime() + 60 * 1000); // +1 minute
-  const newStartTimeString = newStartTime.toISOString();
+  // Extract time portion for TIME column format (HH:MM:SS)
+  const timeString = newStartTime.toTimeString().split(' ')[0];
+  const newStartTimeString = timeString;
   
   try {
     console.log('Starting time adjustment for block:', {

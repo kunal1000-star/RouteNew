@@ -1,1128 +1,940 @@
-// Layer 2: Context & Memory Management System
-// ============================================
-// EnhancedContextBuilder - Ultra-compressed context generation with
-// student profile integration, learning style detection, and performance optimization
+// Layer 2: Enhanced Context Builder with 4-level compression system
+// ================================================================
+// EnhancedContextBuilder - Multi-level context building with educational
+// content integration, knowledge grounding, and student profile optimization
 
 import { supabase } from '@/lib/supabase';
-import { getCurrentUser } from '@/lib/supabase';
 import { logError, logWarning, logInfo } from '@/lib/error-logger';
-import { studentContextBuilder, StudentStudyContext } from '@/lib/ai/student-context-builder';
-import type { Database } from '@/lib/database.types';
+import { searchMemories } from './ConversationMemory';
 
-export type ContextLevel = 1 | 2 | 3 | 4;
-export type ContextType = 'Light' | 'Recent' | 'Selective' | 'Full';
+export type ContextLevel = 'light' | 'recent' | 'selective' | 'full';
+export type EducationalContent = 'facts' | 'concepts' | 'procedures' | 'examples' | 'references';
 
-export interface ContextLevelConfig {
-  level: ContextLevel;
-  name: ContextType;
-  maxTokens: number;
-  maxLength: number;
-  description: string;
-  compressionRatio: number;
+export interface EnhancedContext {
+  studentProfile: UltraCompressedProfile;
+  knowledgeBase: KnowledgeEntry[];
+  conversationHistory: ConversationSummary[];
+  externalSources: EducationalSource[];
+  factCheckPoints: FactCheckPoint[];
+  confidenceMarkers: ConfidenceMarker[];
+  compressionLevel: ContextLevel;
+  tokenUsage: TokenUsage;
+  lastOptimized: Date;
 }
 
-export interface ContextCache {
+export interface UltraCompressedProfile {
   userId: string;
-  level: ContextLevel;
-  context: string;
-  tokenCount: number;
-  relevanceScore: number;
-  createdAt: Date;
-  expiresAt: Date;
-  metadata: ContextMetadata;
-}
-
-export interface ContextMetadata {
-  topics: string[];
-  subjects: string[];
-  difficulty: 'Easy' | 'Medium' | 'Hard';
-  accuracy: number;
-  lastActivity: Date;
-  learningStyle: string;
-  examTarget?: string;
-  cacheKey: string;
-}
-
-export interface ContextOptimizationRequest {
-  userId: string;
-  query: string;
-  requiredLevel: ContextLevel;
-  includeMemories?: boolean;
-  includePreferences?: boolean;
-  tokenBudget?: number;
-  priority: 'speed' | 'accuracy' | 'balance';
-}
-
-export interface ContextOptimizationResult {
-  context: string;
-  tokenCount: number;
-  level: ContextLevel;
-  compressionApplied: boolean;
-  optimizationTime: number;
-  relevanceScore: number;
-  cacheHit: boolean;
-  metadata: ContextMetadata;
-}
-
-export interface LearningStyleDetection {
-  style: 'visual' | 'auditory' | 'kinesthetic' | 'reading' | 'mixed';
-  confidence: number;
-  indicators: string[];
-  recommendations: string[];
-  adaptation: 'increase' | 'maintain' | 'decrease';
-}
-
-export interface StudentProfileIntegration {
-  academicProgress: AcademicProgress;
-  studyPreferences: StudyPreferences;
-  performanceMetrics: PerformanceMetrics;
-  learningPathway: LearningPathway;
-  goalAlignment: GoalAlignment;
-}
-
-export interface AcademicProgress {
-  subjects: SubjectProgress[];
-  strengths: string[];
-  weaknesses: string[];
-  upcomingAssessments: Assessment[];
-  masteryLevel: 'beginner' | 'intermediate' | 'advanced';
-}
-
-export interface SubjectProgress {
-  name: string;
+  learningStyle: LearningStyle;
+  strongSubjects: string[];
+  weakSubjects: string[];
   currentLevel: number;
-  targetLevel: number;
-  progressPercentage: number;
-  estimatedCompletion: Date;
+  streakDays: number;
+  totalPoints: number;
+  preferredComplexity: ComplexityLevel;
+  recentTopics: string[];
+  studyProgress: StudyProgress;
+  learningObjectives: string[];
+  lastSessionSummary: string;
+  compressedMetadata: {
+    totalSessions: number;
+    averageSessionTime: number;
+    mostStudiedSubject: string;
+    learningVelocity: number;
+    attentionSpan: number;
+  };
+}
+
+export interface LearningStyle {
+  type: 'visual' | 'auditory' | 'kinesthetic' | 'reading_writing';
+  preferences: {
+    stepByStep: boolean;
+    examplesFirst: boolean;
+    abstractConcepts: boolean;
+    practicalApplication: boolean;
+  };
+  adaptiveFactors: {
+    difficultyRamp: 'gradual' | 'steep' | 'adaptive';
+    explanationDepth: 'brief' | 'detailed' | 'adaptive';
+    questionFrequency: 'low' | 'medium' | 'high';
+  };
+}
+
+export interface StudyProgress {
+  totalTopics: number;
+  completedTopics: number;
+  masteryLevel: number; // 0-100
+  accuracy: number; // 0-100
+  timeSpent: number; // minutes
   lastActivity: Date;
-  studyTime: number; // in minutes
+  improvementRate: number; // topics per week
 }
 
-export interface Assessment {
-  subject: string;
-  type: 'exam' | 'quiz' | 'assignment';
-  date: Date;
-  weight: number; // 0-1
-  preparation: number; // 0-1
+export interface ComplexityLevel {
+  current: 1 | 2 | 3 | 4 | 5;
+  preferred: 1 | 2 | 3 | 4 | 5;
+  adaptiveRange: [number, number];
 }
 
-export interface StudyPreferences {
-  difficulty: 'Easy' | 'Medium' | 'Hard' | 'Adaptive';
-  sessionDuration: number; // in minutes
-  breakInterval: number; // in minutes
-  preferredTime: 'morning' | 'afternoon' | 'evening' | 'night';
+export interface KnowledgeEntry {
+  id: string;
+  content: string;
+  source: string;
+  confidence: number;
+  lastVerified: Date;
   topics: string[];
-  studyMethods: string[];
+  type: EducationalContent;
+  difficulty: 1 | 2 | 3 | 4 | 5;
+  subject: string;
+  relatedConcepts: string[];
+  educationalValue: number; // 0-1
 }
 
-export interface PerformanceMetrics {
-  averageAccuracy: number;
-  questionsPerSession: number;
-  averageSessionDuration: number;
-  retentionRate: number;
-  improvementRate: number; // percentage change over time
-  strugglingAreas: string[];
+export interface EducationalSource {
+  id: string;
+  type: 'textbook' | 'website' | 'academic_paper' | 'official_doc' | 'verified_content';
+  title: string;
+  content: string;
+  url?: string;
+  author: string;
+  publicationDate: Date;
+  verificationStatus: 'verified' | 'pending' | 'disputed';
+  reliability: number; // 0-1
+  topics: string[];
+  citations: number;
+  educationalRelevance: number; // 0-1
 }
 
-export interface LearningPathway {
-  currentStage: string;
-  nextMilestones: string[];
-  prerequisites: string[];
-  suggestedTopics: string[];
-  difficultyProgression: number[];
+export interface ConversationSummary {
+  conversationId: string;
+  summary: string;
+  keyTopics: string[];
+  learningObjectives: string[];
+  qualityScore: number;
+  duration: number;
+  messagesCount: number;
+  subjects: string[];
+  difficulty: 1 | 2 | 3 | 4 | 5;
+  outcome: 'completed' | 'in_progress' | 'interrupted';
 }
 
-export interface GoalAlignment {
-  shortTerm: string[];
-  longTerm: string[];
-  priorityScore: number; // 0-1
-  progressTowards: number; // 0-1
-  recommendedActions: string[];
+export interface FactCheckPoint {
+  id: string;
+  fact: string;
+  confidence: number;
+  sources: string[];
+  verificationDate: Date;
+  status: 'verified' | 'disputed' | 'pending';
+  educationalContext: string;
+}
+
+export interface ConfidenceMarker {
+  id: string;
+  claim: string;
+  confidence: number; // 0-1
+  reasoning: string;
+  evidence: string[];
+  alternativeViews: string[];
+}
+
+export interface TokenUsage {
+  total: number;
+  profile: number;
+  knowledge: number;
+  history: number;
+  sources: number;
+  remaining: number;
+}
+
+export interface ContextBuildRequest {
+  userId: string;
+  level: ContextLevel;
+  query?: string;
+  tokenLimit?: number;
+  includeMemories?: boolean;
+  includeKnowledge?: boolean;
+  includeProgress?: boolean;
+  subjects?: string[];
+  topics?: string[];
+  timeframe?: {
+    start: Date;
+    end: Date;
+  };
 }
 
 export class EnhancedContextBuilder {
-  private static readonly CONTEXT_LEVELS: ContextLevelConfig[] = [
-    {
-      level: 1,
-      name: 'Light',
-      maxTokens: 50,
-      maxLength: 200,
-      description: 'Basic student profile with minimal context',
-      compressionRatio: 0.9
-    },
-    {
-      level: 2,
-      name: 'Recent',
-      maxTokens: 150,
-      maxLength: 500,
-      description: 'Profile + recent activity summary',
-      compressionRatio: 0.8
-    },
-    {
-      level: 3,
-      name: 'Selective',
-      maxTokens: 300,
-      maxLength: 1000,
-      description: 'Profile + performance metrics + memories',
-      compressionRatio: 0.7
-    },
-    {
-      level: 4,
-      name: 'Full',
-      maxTokens: 500,
-      maxLength: 2000,
-      description: 'Complete context with all data points',
-      compressionRatio: 0.6
-    }
-  ];
+  private static readonly CONTEXT_LEVELS = {
+    light: { maxTokens: 500, compressionRatio: 0.9 },
+    recent: { maxTokens: 1000, compressionRatio: 0.7 },
+    selective: { maxTokens: 2000, compressionRatio: 0.5 },
+    full: { maxTokens: 4000, compressionRatio: 0.3 }
+  };
 
-  private static readonly CACHE_TTL_MINUTES = 15;
-  private static readonly MAX_CACHE_SIZE = 1000;
-  private static readonly MIN_RELEVANCE_THRESHOLD = 0.6;
+  private static readonly DEFAULT_TOKEN_LIMIT = 2048;
+  private static readonly MAX_KNOWLEDGE_ENTRIES = 50;
+  private static readonly MAX_CONVERSATION_SUMMARIES = 10;
 
-  private contextCache: Map<string, ContextCache> = new Map();
-  private cacheSize = 0;
-  private cryptoKey: string;
-  private cacheCleanupInterval: NodeJS.Timeout | null = null;
+  private knowledgeBaseCache: Map<string, KnowledgeEntry[]> = new Map();
+  private profileCache: Map<string, { profile: UltraCompressedProfile; timestamp: Date; expiresAt: Date }> = new Map();
 
   constructor() {
-    this.cryptoKey = process.env.CONTEXT_BUILDING_KEY || 'default-context-key';
     this.startCacheCleanup();
   }
 
   /**
-   * Main context building method with ultra-compression
+   * Build enhanced context with 4-level compression
    */
-  async buildEnhancedContext(request: ContextOptimizationRequest): Promise<ContextOptimizationResult> {
+  async buildContext(request: ContextBuildRequest): Promise<EnhancedContext> {
     const startTime = Date.now();
-    const cacheKey = this.generateCacheKey(request);
     
     try {
-      logInfo('Enhanced context building started', {
+      logInfo('Building enhanced context', {
         componentName: 'EnhancedContextBuilder',
         userId: request.userId,
-        level: request.requiredLevel,
-        priority: request.priority,
-        queryLength: request.query.length
+        level: request.level,
+        query: request.query?.substring(0, 100),
+        tokenLimit: request.tokenLimit
       });
 
-      // Check cache first
-      const cachedContext = this.getCachedContext(cacheKey);
-      if (cachedContext) {
-        logInfo('Context cache hit', {
-          componentName: 'EnhancedContextBuilder',
-          cacheKey,
-          level: request.requiredLevel,
-          relevanceScore: cachedContext.relevanceScore
-        });
-
-        return {
-          context: cachedContext.context,
-          tokenCount: cachedContext.tokenCount,
-          level: request.requiredLevel,
-          compressionApplied: true,
-          optimizationTime: Date.now() - startTime,
-          relevanceScore: cachedContext.relevanceScore,
-          cacheHit: true,
-          metadata: cachedContext.metadata
-        };
-      }
-
-      // Build context from scratch
-      const baseContext = await this.buildBaseContext(request);
-      const optimizedContext = await this.optimizeContext(baseContext, request);
-      const metadata = await this.extractContextMetadata(optimizedContext, request);
+      // Get compressed student profile
+      const studentProfile = await this.getUltraCompressedProfile(request.userId);
       
-      // Check if context meets relevance threshold
-      const relevanceScore = this.calculateRelevanceScore(optimizedContext, request.query);
-      if (relevanceScore < EnhancedContextBuilder.MIN_RELEVANCE_THRESHOLD) {
-        const enhancedContext = await this.enhanceContextRelevance(optimizedContext, request, relevanceScore);
-        const finalMetadata = await this.extractContextMetadata(enhancedContext, request);
-        
-        const result: ContextOptimizationResult = {
-          context: enhancedContext,
-          tokenCount: this.estimateTokenCount(enhancedContext),
-          level: request.requiredLevel,
-          compressionApplied: true,
-          optimizationTime: Date.now() - startTime,
-          relevanceScore: this.calculateRelevanceScore(enhancedContext, request.query),
-          cacheHit: false,
-          metadata: finalMetadata
-        };
+      // Get knowledge base content
+      const knowledgeBase = request.includeKnowledge !== false 
+        ? await this.getRelevantKnowledgeBase(request)
+        : [];
 
-        this.cacheContext(cacheKey, result);
-        return result;
+      // Get conversation history
+      const conversationHistory = await this.getConversationSummaries(request);
+      
+      // Get external educational sources
+      const externalSources = await this.getEducationalSources(request);
+      
+      // Create fact check points
+      const factCheckPoints = await this.generateFactCheckPoints(request, knowledgeBase);
+      
+      // Generate confidence markers
+      const confidenceMarkers = await this.generateConfidenceMarkers(request, knowledgeBase);
+      
+      // Calculate token usage
+      const tokenUsage = this.calculateTokenUsage({
+        studentProfile,
+        knowledgeBase,
+        conversationHistory,
+        externalSources
+      });
+
+      // Check if we need to optimize for token limit
+      if (request.tokenLimit && tokenUsage.total > request.tokenLimit) {
+        const optimization = await this.optimizeForTokenLimit(
+          { studentProfile, knowledgeBase, conversationHistory, externalSources, factCheckPoints, confidenceMarkers },
+          request.tokenLimit,
+          request.level
+        );
+        
+        return {
+          ...optimization,
+          compressionLevel: request.level,
+          tokenUsage: this.calculateTokenUsage(optimization),
+          lastOptimized: new Date()
+        };
       }
 
-      const result: ContextOptimizationResult = {
-        context: optimizedContext,
-        tokenCount: this.estimateTokenCount(optimizedContext),
-        level: request.requiredLevel,
-        compressionApplied: true,
-        optimizationTime: Date.now() - startTime,
-        relevanceScore,
-        cacheHit: false,
-        metadata
+      const context: EnhancedContext = {
+        studentProfile,
+        knowledgeBase,
+        conversationHistory,
+        externalSources,
+        factCheckPoints,
+        confidenceMarkers,
+        compressionLevel: request.level,
+        tokenUsage,
+        lastOptimized: new Date()
       };
 
-      this.cacheContext(cacheKey, result);
-      return result;
+      const processingTime = Date.now() - startTime;
+      logInfo('Enhanced context built successfully', {
+        componentName: 'EnhancedContextBuilder',
+        userId: request.userId,
+        level: request.level,
+        tokenUsage: tokenUsage.total,
+        processingTime
+      });
+
+      return context;
 
     } catch (error) {
       logError(error instanceof Error ? error : new Error(String(error)), {
         componentName: 'EnhancedContextBuilder',
-        userId: request.userId,
-        level: request.requiredLevel,
-        query: request.query.substring(0, 100)
+        operation: 'build_context',
+        userId: request.userId
       });
 
-      // Return minimal safe context on error
-      return this.createFallbackContext(request, Date.now() - startTime);
+      throw new Error(`Failed to build enhanced context: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   /**
-   * Build base context using existing student context builder
+   * Get ultra-compressed student profile
    */
-  private async buildBaseContext(request: ContextOptimizationRequest): Promise<StudentStudyContext> {
+  private async getUltraCompressedProfile(userId: string): Promise<UltraCompressedProfile> {
+    // Check cache first
+    const cached = this.profileCache.get(userId);
+    if (cached && cached.expiresAt > new Date()) {
+      return cached.profile;
+    }
+
     try {
-      return await studentContextBuilder.buildFullAIContext(request.userId, request.requiredLevel);
+      // Get student profile from database
+      const { data: profileData, error: profileError } = await (supabase
+        .from('student_profiles') as any)
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        throw new Error(`Failed to fetch student profile: ${profileError.message}`);
+      }
+
+      // Get gamification data
+      const { data: gamificationData, error: gamificationError } = await (supabase
+        .from('student_gamification') as any)
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (gamificationError && gamificationError.code !== 'PGRST116') {
+        logWarning('Failed to fetch gamification data', { userId, error: gamificationError.message });
+      }
+
+      // Get recent study activity
+      const { data: recentActivity, error: activityError } = await (supabase
+        .from('study_sessions') as any)
+        .select('subject, topic, duration, completed, accuracy')
+        .eq('user_id', userId)
+        .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (activityError) {
+        logWarning('Failed to fetch recent activity', { userId, error: activityError.message });
+      }
+
+      // Get learning preferences
+      const { data: preferencesData, error: preferencesError } = await (supabase
+        .from('user_preferences') as any)
+        .select('learning_style, preferred_difficulty, explanation_style, question_frequency')
+        .eq('user_id', userId)
+        .single();
+
+      if (preferencesError && preferencesError.code !== 'PGRST116') {
+        logWarning('Failed to fetch learning preferences', { userId, error: preferencesError.message });
+      }
+
+      // Build ultra-compressed profile
+      const profile: UltraCompressedProfile = {
+        userId,
+        learningStyle: this.extractLearningStyle(preferencesData, recentActivity),
+        strongSubjects: this.extractStrongSubjects(recentActivity || []),
+        weakSubjects: this.extractWeakSubjects(recentActivity || []),
+        currentLevel: (gamificationData as any)?.level || 1,
+        streakDays: (gamificationData as any)?.current_streak || 0,
+        totalPoints: (gamificationData as any)?.total_points || 0,
+        preferredComplexity: this.extractComplexityLevel(preferencesData, recentActivity || []),
+        recentTopics: this.extractRecentTopics(recentActivity || []),
+        studyProgress: this.calculateStudyProgress(recentActivity || []),
+        learningObjectives: this.extractLearningObjectives(recentActivity || []),
+        lastSessionSummary: this.generateLastSessionSummary(recentActivity || []),
+        compressedMetadata: this.calculateCompressedMetadata(recentActivity || [], gamificationData)
+      };
+
+      // Cache the profile
+      this.profileCache.set(userId, {
+        profile,
+        timestamp: new Date(),
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
+      });
+
+      return profile;
+
     } catch (error) {
-      logWarning('Failed to build base context, using fallback', {
+      logError(error instanceof Error ? error : new Error(String(error)), {
         componentName: 'EnhancedContextBuilder',
-        userId: request.userId,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        operation: 'get_ultra_compressed_profile',
+        userId
       });
 
-      // Return fallback context
-      return this.createFallbackStudentContext(request.userId);
+      // Return minimal default profile
+      return this.createDefaultProfile(userId);
     }
   }
 
   /**
-   * Optimize context based on level and requirements
+   * Get relevant knowledge base entries
    */
-  private async optimizeContext(baseContext: StudentStudyContext, request: ContextOptimizationRequest): Promise<string> {
-    const config = EnhancedContextBuilder.CONTEXT_LEVELS[request.requiredLevel - 1];
-    let optimized = '';
-
-    switch (request.requiredLevel) {
-      case 1:
-        optimized = this.buildLightContext(baseContext, config);
-        break;
-      case 2:
-        optimized = this.buildRecentContext(baseContext, config);
-        break;
-      case 3:
-        optimized = this.buildSelectiveContext(baseContext, config, request);
-        break;
-      case 4:
-        optimized = await this.buildFullContext(baseContext, config, request);
-        break;
-      default:
-        optimized = this.buildLightContext(baseContext, config);
-    }
-
-    // Apply compression if needed
-    if (optimized.length > config.maxLength) {
-      optimized = this.applyContextCompression(optimized, config);
-    }
-
-    // Add learning style adaptation if available
-    if (baseContext.learningStyle) {
-      optimized = this.integrateLearningStyle(optimized, baseContext.learningStyle);
-    }
-
-    return optimized;
-  }
-
-  /**
-   * Build light context (Level 1)
-   */
-  private buildLightContext(context: StudentStudyContext, config: ContextLevelConfig): string {
-    const parts: string[] = [];
-
-    // Essential profile info
-    if (context.profileText) {
-      parts.push(context.profileText);
-    }
-
-    // Key performance indicators
-    if (context.studyProgress.accuracy > 0) {
-      parts.push(`Accuracy: ${context.studyProgress.accuracy}%`);
-    }
-
-    // Current level and status
-    if (context.currentData.level > 1) {
-      parts.push(`Level ${context.currentData.level}, ${context.currentData.streak} day streak`);
-    }
-
-    return parts.join('. ') || 'Student profile: Learning actively';
-  }
-
-  /**
-   * Build recent context (Level 2)
-   */
-  private buildRecentContext(context: StudentStudyContext, config: ContextLevelConfig): string {
-    const parts: string[] = [];
-
-    // Profile
-    if (context.profileText) {
-      parts.push(context.profileText);
-    }
-
-    // Recent activity
-    if (context.recentActivity.lastStudySession) {
-      const daysSince = Math.floor((Date.now() - context.recentActivity.lastStudySession.getTime()) / (1000 * 60 * 60 * 24));
-      if (daysSince <= 7) {
-        parts.push(`Last study: ${daysSince} days ago`);
+  private async getRelevantKnowledgeBase(request: ContextBuildRequest): Promise<KnowledgeEntry[]> {
+    try {
+      const cacheKey = `knowledge_${request.userId}_${request.subjects?.join(',') || 'all'}`;
+      const cached = this.knowledgeBaseCache.get(cacheKey);
+      
+      if (cached) {
+        return cached.slice(0, EnhancedContextBuilder.MAX_KNOWLEDGE_ENTRIES);
       }
-    }
 
-    // Performance this week
-    if (context.recentActivity.questionsAnswered > 0) {
-      parts.push(`This week: ${context.recentActivity.questionsAnswered} questions, ${context.recentActivity.correctAnswers} correct`);
-    }
+      let query = (supabase
+        .from('educational_knowledge_base') as any)
+        .select('*')
+        .eq('verification_status', 'verified')
+        .gte('reliability', 0.7)
+        .order('educational_value', { ascending: false })
+        .limit(EnhancedContextBuilder.MAX_KNOWLEDGE_ENTRIES);
 
-    // Current focus areas
-    if (context.strongSubjects.length > 0) {
-      parts.push(`Strong: ${context.strongSubjects.slice(0, 2).join(', ')}`);
-    }
-
-    if (context.weakSubjects.length > 0) {
-      parts.push(`Improving: ${context.weakSubjects.slice(0, 2).join(', ')}`);
-    }
-
-    return parts.join('\n') || 'Recent learning activity: Active student';
-  }
-
-  /**
-   * Build selective context (Level 3)
-   */
-  private buildSelectiveContext(context: StudentStudyContext, config: ContextLevelConfig, request: ContextOptimizationRequest): string {
-    const parts: string[] = [];
-
-    // Profile with additional details
-    if (context.profileText) {
-      parts.push(`STUDENT PROFILE: ${context.profileText}`);
-    }
-
-    // Performance metrics
-    parts.push('PERFORMANCE METRICS:');
-    parts.push(`• Progress: ${context.studyProgress.completedTopics}/${context.studyProgress.totalTopics} topics (${context.studyProgress.accuracy}%)`);
-    parts.push(`• Study time: ${context.studyProgress.timeSpent} hours total`);
-    parts.push(`• Current streak: ${context.currentData.streak} days`);
-    parts.push(`• Level: ${context.currentData.level} (${context.currentData.points} points)`);
-
-    // Strengths and weaknesses
-    if (context.strongSubjects.length > 0 || context.weakSubjects.length > 0) {
-      parts.push('PERFORMANCE ANALYSIS:');
-      if (context.strongSubjects.length > 0) {
-        parts.push(`• Strong subjects: ${context.strongSubjects.join(', ')}`);
+      if (request.subjects && request.subjects.length > 0) {
+        query = query.overlaps('subjects', request.subjects);
       }
-      if (context.weakSubjects.length > 0) {
-        parts.push(`• Areas for improvement: ${context.weakSubjects.join(', ')}`);
+
+      if (request.topics && request.topics.length > 0) {
+        query = query.overlaps('topics', request.topics);
       }
-    }
 
-    // Recent learning patterns
-    if (context.recentActivity.questionsAnswered > 0) {
-      parts.push('RECENT ACTIVITY (7 days):');
-      parts.push(`• Questions attempted: ${context.recentActivity.questionsAnswered}`);
-      parts.push(`• Strong performance: ${context.recentActivity.topicsStrong.join(', ') || 'Building skills'}`);
-      if (context.recentActivity.topicsStruggled.length > 0) {
-        parts.push(`• Challenging areas: ${context.recentActivity.topicsStruggled.join(', ')}`);
+      if (request.query) {
+        query = query.or(`content.ilike.%${request.query}%,title.ilike.%${request.query}%`);
       }
-    }
 
-    // Learning preferences
-    if (context.learningStyle) {
-      parts.push(`LEARNING STYLE: ${context.learningStyle}`);
-    }
+      const { data, error } = await query;
 
-    if (context.examTarget) {
-      parts.push(`EXAM TARGET: ${context.examTarget}`);
-    }
-
-    return parts.join('\n');
-  }
-
-  /**
-   * Build full context (Level 4)
-   */
-  private async buildFullContext(context: StudentStudyContext, config: ContextLevelConfig, request: ContextOptimizationRequest): Promise<string> {
-    const parts: string[] = [];
-
-    // Complete student profile
-    parts.push('=== COMPLETE STUDENT PROFILE ===');
-    parts.push(`Profile: ${context.profileText}`);
-
-    // Academic progress
-    parts.push('\n=== ACADEMIC PROGRESS ===');
-    parts.push(`Total Topics: ${context.studyProgress.totalTopics}`);
-    parts.push(`Completed: ${context.studyProgress.completedTopics} (${context.studyProgress.accuracy}%)`);
-    parts.push(`Subjects Studied: ${context.studyProgress.subjectsStudied.join(', ')}`);
-    parts.push(`Time Investment: ${context.studyProgress.timeSpent} hours`);
-
-    // Performance analysis
-    parts.push('\n=== PERFORMANCE ANALYSIS ===');
-    parts.push(`Strong Subjects: ${context.strongSubjects.join(', ') || 'Building foundation'}`);
-    parts.push(`Areas Needing Work: ${context.weakSubjects.join(', ') || 'Developing consistently'}`);
-    parts.push(`Learning Style: ${context.learningStyle || 'Adaptable'}`);
-    parts.push(`Exam Target: ${context.examTarget || 'General improvement'}`);
-
-    // Current status
-    parts.push('\n=== CURRENT STATUS ===');
-    parts.push(`Study Streak: ${context.currentData.streak} days`);
-    parts.push(`Current Level: ${context.currentData.level}`);
-    parts.push(`Experience Points: ${context.currentData.points}`);
-    parts.push(`Pending Revisions: ${context.currentData.revisionQueue}`);
-    if (context.currentData.pendingTopics.length > 0) {
-      parts.push(`Next Focus Topics: ${context.currentData.pendingTopics.join(', ')}`);
-    }
-
-    // Study preferences
-    parts.push('\n=== STUDY PREFERENCES ===');
-    parts.push(`Preferred Difficulty: ${context.preferences.difficulty}`);
-    parts.push(`Focus Subjects: ${context.preferences.subjects.join(', ')}`);
-    parts.push(`Study Goals: ${context.preferences.studyGoals.join(', ')}`);
-
-    // Detailed recent activity
-    if (context.recentActivity.questionsAnswered > 0) {
-      parts.push('\n=== RECENT LEARNING PATTERNS (7 days) ===');
-      parts.push(`Last Study Session: ${context.recentActivity.lastStudySession?.toLocaleDateString() || 'No recent activity'}`);
-      parts.push(`Questions Attempted: ${context.recentActivity.questionsAnswered}`);
-      parts.push(`Correct Responses: ${context.recentActivity.correctAnswers}`);
-      parts.push(`Peak Performance Areas: ${context.recentActivity.topicsStrong.join(', ') || 'Consistent effort'}`);
-      parts.push(`Challenging Topics: ${context.recentActivity.topicsStruggled.join(', ') || 'Managing well'}`);
-    }
-
-    // Add enhanced metadata
-    if (request.includeMemories) {
-      const memories = await this.getRelevantMemories(context.userId, request.query);
-      if (memories.length > 0) {
-        parts.push('\n=== RELEVANT LEARNING MEMORIES ===');
-        parts.push(memories.slice(0, 3).map(m => `• ${m.description} (${m.relevance} relevance)`).join('\n'));
+      if (error) {
+        throw new Error(`Failed to fetch knowledge base: ${error.message}`);
       }
-    }
 
-    if (request.includePreferences) {
-      const preferences = await this.getDetailedPreferences(context.userId);
-      if (preferences) {
-        parts.push('\n=== DETAILED PREFERENCES ===');
-        parts.push(`Session Duration: ${preferences.sessionDuration} minutes`);
-        parts.push(`Preferred Study Time: ${preferences.preferredTime}`);
-        parts.push(`Break Interval: ${preferences.breakInterval} minutes`);
-      }
-    }
+      const knowledgeEntries: KnowledgeEntry[] = (data || []).map((entry: any) => ({
+        id: entry.id,
+        content: entry.content,
+        source: entry.source,
+        confidence: entry.reliability,
+        lastVerified: new Date(entry.updated_at),
+        topics: entry.topics || [],
+        type: this.mapContentType(entry.type),
+        difficulty: entry.difficulty_level || 3,
+        subject: entry.subject,
+        relatedConcepts: entry.related_concepts || [],
+        educationalValue: entry.educational_value || 0.5
+      }));
 
-    return parts.join('\n');
-  }
+      // Cache the results
+      this.knowledgeBaseCache.set(cacheKey, knowledgeEntries);
 
-  /**
-   * Apply context compression to fit token budget
-   */
-  private applyContextCompression(context: string, config: ContextLevelConfig): string {
-    let compressed = context;
+      return knowledgeEntries;
 
-    // Remove redundant whitespace
-    compressed = compressed.replace(/\s+/g, ' ').trim();
-
-    // Abbreviate common phrases
-    const abbreviations: Record<string, string> = {
-      'approximately': '~',
-      'minutes': 'min',
-      'hours': 'h',
-      'questions': 'Q',
-      'answers': 'A',
-      'topics': 'T',
-      'subjects': 'S',
-      'performance': 'perf',
-      'accuracy': 'acc',
-      'progression': 'prog'
-    };
-
-    for (const [full, abbrev] of Object.entries(abbreviations)) {
-      const regex = new RegExp(`\\b${full}\\b`, 'gi');
-      compressed = compressed.replace(regex, abbrev);
-    }
-
-    // Remove less critical sentences if still too long
-    if (compressed.length > config.maxLength) {
-      const sentences = compressed.split(/[.!?]+/);
-      const criticalSentences = sentences.filter(s => {
-        const lower = s.toLowerCase();
-        return lower.includes('profile') || 
-               lower.includes('level') || 
-               lower.includes('accuracy') || 
-               lower.includes('streak') ||
-               lower.includes('progress');
+    } catch (error) {
+      logWarning('Failed to fetch knowledge base', { 
+        userId: request.userId, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
       });
-
-      if (criticalSentences.length > 0) {
-        compressed = criticalSentences.join('. ') + '.';
-      }
+      return [];
     }
-
-    // Final trim if still too long
-    if (compressed.length > config.maxLength) {
-      compressed = compressed.substring(0, config.maxLength - 3) + '...';
-    }
-
-    return compressed;
   }
 
   /**
-   * Integrate learning style into context
+   * Get conversation summaries
    */
-  private integrateLearningStyle(context: string, learningStyle: string): string {
-    const styleAdaptations: Record<string, string> = {
-      'visual': ' (Prefers visual learning methods)',
-      'auditory': ' (Benefits from verbal explanations)',
-      'kinesthetic': ' (Learns best through hands-on practice)',
-      'reading': ' (Prefers written materials and reading)',
-      'deep focus': ' (Requires extended study sessions)',
-      'balanced': ' (Adapts well to various methods)',
-      'quick learning': ' (Prefers short, intensive sessions)'
-    };
+  private async getConversationSummaries(request: ContextBuildRequest): Promise<ConversationSummary[]> {
+    try {
+      let query = (supabase
+        .from('conversation_summaries') as any)
+        .select('*')
+        .eq('user_id', request.userId)
+        .order('created_at', { ascending: false })
+        .limit(EnhancedContextBuilder.MAX_CONVERSATION_SUMMARIES);
 
-    const adaptation = styleAdaptations[learningStyle.toLowerCase()] || '';
-    
-    // Add learning style context
-    if (!context.includes('learning style') && !context.includes('method')) {
-      return context + `\nLearning style: ${learningStyle}${adaptation}`;
+      if (request.timeframe) {
+        query = query
+          .gte('created_at', request.timeframe.start.toISOString())
+          .lte('created_at', request.timeframe.end.toISOString());
+      }
+
+      if (request.subjects && request.subjects.length > 0) {
+        query = query.overlaps('subjects', request.subjects);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        throw new Error(`Failed to fetch conversation summaries: ${error.message}`);
+      }
+
+      return (data || []).map((summary: any) => ({
+        conversationId: summary.conversation_id,
+        summary: summary.summary,
+        keyTopics: summary.key_topics || [],
+        learningObjectives: summary.learning_objectives || [],
+        qualityScore: summary.quality_score || 0.5,
+        duration: summary.duration || 0,
+        messagesCount: summary.messages_count || 0,
+        subjects: summary.subjects || [],
+        difficulty: summary.difficulty_level || 3,
+        outcome: summary.outcome || 'in_progress'
+      }));
+
+    } catch (error) {
+      logWarning('Failed to fetch conversation summaries', { 
+        userId: request.userId, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+      return [];
     }
-
-    return context;
   }
 
   /**
-   * Calculate relevance score for context
+   * Get educational sources
    */
-  private calculateRelevanceScore(context: string, query: string): number {
-    const queryWords = query.toLowerCase().split(/\s+/);
-    const contextWords = context.toLowerCase().split(/\s+/);
-    
-    let matches = 0;
-    const relevantTerms = ['progress', 'performance', 'accuracy', 'study', 'topics', 'subjects', 'level', 'streak', 'questions', 'weak', 'strong'];
-    
-    // Check for direct term matches
-    for (const word of queryWords) {
-      if (contextWords.includes(word)) {
-        matches++;
-      }
-    }
+  private async getEducationalSources(request: ContextBuildRequest): Promise<EducationalSource[]> {
+    try {
+      let query = (supabase
+        .from('educational_sources') as any)
+        .select('*')
+        .eq('verification_status', 'verified')
+        .gte('reliability', 0.8)
+        .order('educational_relevance', { ascending: false })
+        .limit(20);
 
-    // Check for relevant concept matches
-    for (const term of relevantTerms) {
-      if (query.toLowerCase().includes(term) && context.toLowerCase().includes(term)) {
-        matches += 0.5;
+      if (request.subjects && request.subjects.length > 0) {
+        query = query.overlaps('topics', request.subjects);
       }
-    }
 
-    const maxPossible = Math.max(queryWords.length, 10);
-    return Math.min(1.0, matches / maxPossible);
+      const { data, error } = await query;
+
+      if (error) {
+        throw new Error(`Failed to fetch educational sources: ${error.message}`);
+      }
+
+      return (data || []).map((source: any) => ({
+        id: source.id,
+        type: this.mapSourceType(source.type),
+        title: source.title,
+        content: source.content,
+        url: source.url,
+        author: source.author,
+        publicationDate: new Date(source.publication_date),
+        verificationStatus: source.verification_status,
+        reliability: source.reliability,
+        topics: source.topics || [],
+        citations: source.citations || 0,
+        educationalRelevance: source.educational_relevance || 0.5
+      }));
+
+    } catch (error) {
+      logWarning('Failed to fetch educational sources', { 
+        userId: request.userId, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+      return [];
+    }
   }
 
   /**
-   * Enhance context relevance when score is below threshold
+   * Generate fact check points
    */
-  private async enhanceContextRelevance(context: string, request: ContextOptimizationRequest, currentScore: number): Promise<string> {
-    let enhanced = context;
+  private async generateFactCheckPoints(request: ContextBuildRequest, knowledgeBase: KnowledgeEntry[]): Promise<FactCheckPoint[]> {
+    try {
+      const factCheckPoints: FactCheckPoint[] = [];
 
-    // Add query-specific information
-    const queryLower = request.query.toLowerCase();
-    
-    if (queryLower.includes('progress') || queryLower.includes('performance')) {
-      const progressData = await this.getProgressDetails(request.userId);
-      if (progressData) {
-        enhanced += `\nDETAILED PROGRESS: ${progressData}`;
-      }
-    }
-
-    if (queryLower.includes('accuracy') || queryLower.includes('score')) {
-      const accuracyData = await this.getAccuracyDetails(request.userId);
-      if (accuracyData) {
-        enhanced += `\nACCURACY ANALYSIS: ${accuracyData}`;
-      }
-    }
-
-    if (queryLower.includes('weak') || queryLower.includes('struggle')) {
-      const strugglingAreas = await this.getStrugglingAreas(request.userId);
-      if (strugglingAreas.length > 0) {
-        enhanced += `\nCHALLENGING AREAS: ${strugglingAreas.join(', ')}`;
-      }
-    }
-
-    if (queryLower.includes('strong') || queryLower.includes('good')) {
-      const strongAreas = await this.getStrongAreas(request.userId);
-      if (strongAreas.length > 0) {
-        enhanced += `\nSTRONG AREAS: ${strongAreas.join(', ')}`;
-      }
-    }
-
-    return enhanced;
-  }
-
-  /**
-   * Extract metadata from context
-   */
-  private async extractContextMetadata(context: string, request: ContextOptimizationRequest): Promise<ContextMetadata> {
-    const topics = this.extractTopics(context);
-    const subjects = this.extractSubjects(context);
-    const difficulty = this.extractDifficulty(context);
-    const accuracy = this.extractAccuracy(context);
-    const lastActivity = await this.getLastActivityDate(request.userId);
-    const learningStyle = await this.getLearningStyle(request.userId);
-    const examTarget = await this.getExamTarget(request.userId);
-
-    return {
-      topics,
-      subjects,
-      difficulty,
-      accuracy,
-      lastActivity,
-      learningStyle,
-      examTarget,
-      cacheKey: this.generateCacheKey(request)
-    };
-  }
-
-  /**
-   * Cache management methods
-   */
-  private generateCacheKey(request: ContextOptimizationRequest): string {
-    const keyData = {
-      userId: request.userId,
-      level: request.requiredLevel,
-      query: request.query.substring(0, 50), // First 50 chars for uniqueness
-      includeMemories: request.includeMemories || false,
-      includePreferences: request.includePreferences || false
-    };
-    
-    const crypto = require('crypto');
-    return crypto.createHash('md5').update(JSON.stringify(keyData)).digest('hex');
-  }
-
-  private getCachedContext(cacheKey: string): ContextCache | null {
-    const cached = this.contextCache.get(cacheKey);
-    if (!cached) return null;
-
-    if (cached.expiresAt < new Date()) {
-      this.contextCache.delete(cacheKey);
-      this.cacheSize--;
-      return null;
-    }
-
-    return cached;
-  }
-
-  private cacheContext(cacheKey: string, result: ContextOptimizationResult): void {
-    // Implement LRU cache eviction if needed
-    if (this.cacheSize >= EnhancedContextBuilder.MAX_CACHE_SIZE) {
-      this.evictOldestCache();
-    }
-
-    const cache: ContextCache = {
-      userId: result.metadata.cacheKey.split('_')[0], // Extract userId from cache key
-      level: result.level,
-      context: result.context,
-      tokenCount: result.tokenCount,
-      relevanceScore: result.relevanceScore,
-      createdAt: new Date(),
-      expiresAt: new Date(Date.now() + EnhancedContextBuilder.CACHE_TTL_MINUTES * 60 * 1000),
-      metadata: result.metadata
-    };
-
-    this.contextCache.set(cacheKey, cache);
-    this.cacheSize++;
-  }
-
-  private evictOldestCache(): void {
-    let oldestKey = '';
-    let oldestTime = Date.now();
-
-    for (const [key, cache] of this.contextCache.entries()) {
-      if (cache.createdAt.getTime() < oldestTime) {
-        oldestTime = cache.createdAt.getTime();
-        oldestKey = key;
-      }
-    }
-
-    if (oldestKey) {
-      this.contextCache.delete(oldestKey);
-      this.cacheSize--;
-    }
-  }
-
-  private startCacheCleanup(): void {
-    this.cacheCleanupInterval = setInterval(() => {
-      const now = new Date();
-      let cleaned = 0;
-
-      for (const [key, cache] of this.contextCache.entries()) {
-        if (cache.expiresAt < now) {
-          this.contextCache.delete(key);
-          cleaned++;
-          this.cacheSize--;
+      for (const entry of knowledgeBase.slice(0, 10)) {
+        if (entry.type === 'facts' && entry.confidence > 0.8) {
+          factCheckPoints.push({
+            id: `fact_${entry.id}`,
+            fact: entry.content.substring(0, 200) + '...',
+            confidence: entry.confidence,
+            sources: [entry.source],
+            verificationDate: entry.lastVerified,
+            status: 'verified',
+            educationalContext: entry.subject
+          });
         }
       }
 
-      if (cleaned > 0) {
-        logInfo('Context cache cleanup completed', {
-          componentName: 'EnhancedContextBuilder',
-          entriesRemoved: cleaned,
-          remainingEntries: this.cacheSize
-        });
-      }
-    }, 5 * 60 * 1000); // Clean every 5 minutes
+      return factCheckPoints;
+
+    } catch (error) {
+      logWarning('Failed to generate fact check points', { error });
+      return [];
+    }
   }
 
   /**
-   * Helper methods for data extraction and enhancement
+   * Generate confidence markers
    */
-  private extractTopics(context: string): string[] {
-    // Extract topics mentioned in context
-    const topicPatterns = [
-      /topics?:?\s*([^.\n]+)/gi,
-      /focus.*?topics?:?\s*([^.\n]+)/gi,
-      /studying.*?([^.\n]+topics)/gi
-    ];
+  private async generateConfidenceMarkers(request: ContextBuildRequest, knowledgeBase: KnowledgeEntry[]): Promise<ConfidenceMarker[]> {
+    try {
+      const confidenceMarkers: ConfidenceMarker[] = [];
 
-    const topics: string[] = [];
-    for (const pattern of topicPatterns) {
-      const matches = Array.from(context.matchAll(pattern));
-      matches.forEach(match => {
-        if (match[1]) {
-          const extracted = match[1].split(/[,;]/).map(t => t.trim());
-          topics.push(...extracted);
+      for (const entry of knowledgeBase.slice(0, 5)) {
+        if (entry.educationalValue > 0.7) {
+          confidenceMarkers.push({
+            id: `confidence_${entry.id}`,
+            claim: entry.content.substring(0, 150) + '...',
+            confidence: entry.confidence,
+            reasoning: `High educational value (${entry.educationalValue}) and verified source`,
+            evidence: [entry.source],
+            alternativeViews: [`Alternative perspective on ${entry.subject}`]
+          });
         }
-      });
-    }
-
-    return [...new Set(topics)].filter(t => t.length > 0);
-  }
-
-  private extractSubjects(context: string): string[] {
-    // Extract subjects mentioned in context
-    const subjectPatterns = [
-      /subjects?:?\s*([^.\n]+)/gi,
-      /strong.*?subjects?:?\s*([^.\n]+)/gi,
-      /studying.*?([^.\n]+subjects)/gi
-    ];
-
-    const subjects: string[] = [];
-    for (const pattern of subjectPatterns) {
-      const matches = Array.from(context.matchAll(pattern));
-      matches.forEach(match => {
-        if (match[1]) {
-          const extracted = match[1].split(/[,;]/).map(s => s.trim());
-          subjects.push(...extracted);
-        }
-      });
-    }
-
-    return [...new Set(subjects)].filter(s => s.length > 0);
-  }
-
-  private extractDifficulty(context: string): 'Easy' | 'Medium' | 'Hard' {
-    const lower = context.toLowerCase();
-    if (lower.includes('hard') || lower.includes('difficult')) return 'Hard';
-    if (lower.includes('easy') || lower.includes('simple')) return 'Easy';
-    return 'Medium';
-  }
-
-  private extractAccuracy(context: string): number {
-    const accuracyMatch = context.match(/accuracy:?\s*(\d+)%/i);
-    if (accuracyMatch) {
-      return parseInt(accuracyMatch[1], 10);
-    }
-    return 0;
-  }
-
-  private estimateTokenCount(text: string): number {
-    // Rough estimation: 1 token ≈ 4 characters
-    return Math.ceil(text.length / 4);
-  }
-
-  // Database integration methods
-  private async getProgressDetails(userId: string): Promise<string | null> {
-    try {
-      const { data, error } = await supabase
-        .from('conversation_memory')
-        .select('interaction_data')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (error) throw error;
-      
-      if (data && Array.isArray(data) && data.length > 0) {
-        const recentData = data
-          .map(d => (d as any).interaction_data)
-          .filter(Boolean);
-        return `Recent progress tracking active with ${recentData.length} recent sessions`;
       }
-      
-      return null;
+
+      return confidenceMarkers;
+
     } catch (error) {
-      logWarning('Failed to get progress details', { userId, error });
-      return null;
-    }
-  }
-
-  private async getAccuracyDetails(userId: string): Promise<string | null> {
-    try {
-      const { data, error } = await supabase
-        .from('quality_metrics')
-        .select('quality_score')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-      
-      if (data && Array.isArray(data) && data.length > 0) {
-        const avgQuality = data.reduce((sum, d) => {
-          const score = (d as any).quality_score;
-          return sum + (typeof score === 'number' ? score : 0);
-        }, 0) / data.length;
-        return `Recent quality scores averaging ${(avgQuality * 100).toFixed(1)}%`;
-      }
-      
-      return null;
-    } catch (error) {
-      logWarning('Failed to get accuracy details', { userId, error });
-      return null;
-    }
-  }
-
-  private async getStrugglingAreas(userId: string): Promise<string[]> {
-    try {
-      const { data, error } = await supabase
-        .from('context_optimization_logs')
-        .select('optimized_context')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-      
-      const areas: string[] = [];
-      if (data && Array.isArray(data)) {
-        data.forEach(log => {
-          const context = (log as any).optimized_context;
-          if (context && typeof context === 'object' && context.weakSubjects) {
-            areas.push(...context.weakSubjects);
-          }
-        });
-      }
-      
-      return [...new Set(areas)];
-    } catch (error) {
-      logWarning('Failed to get struggling areas', { userId, error });
+      logWarning('Failed to generate confidence markers', { error });
       return [];
     }
   }
 
-  private async getStrongAreas(userId: string): Promise<string[]> {
-    try {
-      const { data, error } = await supabase
-        .from('context_optimization_logs')
-        .select('optimized_context')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(10);
+  /**
+   * Calculate token usage
+   */
+  private calculateTokenUsage(context: {
+    studentProfile: UltraCompressedProfile;
+    knowledgeBase: KnowledgeEntry[];
+    conversationHistory: ConversationSummary[];
+    externalSources: EducationalSource[];
+  }): TokenUsage {
+    const profileTokens = this.estimateTokens(JSON.stringify(context.studentProfile));
+    const knowledgeTokens = context.knowledgeBase.reduce((sum, entry) => 
+      sum + this.estimateTokens(entry.content), 0);
+    const historyTokens = context.conversationHistory.reduce((sum, summary) => 
+      sum + this.estimateTokens(summary.summary), 0);
+    const sourcesTokens = context.externalSources.reduce((sum, source) => 
+      sum + this.estimateTokens(source.content), 0);
 
-      if (error) throw error;
-      
-      const areas: string[] = [];
-      if (data && Array.isArray(data)) {
-        data.forEach(log => {
-          const context = (log as any).optimized_context;
-          if (context && typeof context === 'object' && context.strongSubjects) {
-            areas.push(...context.strongSubjects);
-          }
-        });
-      }
-      
-      return [...new Set(areas)];
-    } catch (error) {
-      logWarning('Failed to get strong areas', { userId, error });
-      return [];
-    }
-  }
+    const total = profileTokens + knowledgeTokens + historyTokens + sourcesTokens;
+    const remaining = EnhancedContextBuilder.DEFAULT_TOKEN_LIMIT - total;
 
-  private async getLastActivityDate(userId: string): Promise<Date> {
-    try {
-      const { data, error } = await supabase
-        .from('conversation_memory')
-        .select('created_at')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      
-      const createdAt = (data as any)?.created_at;
-      return createdAt ? new Date(createdAt) : new Date();
-    } catch (error) {
-      logWarning('Failed to get last activity date', { userId, error });
-      return new Date();
-    }
-  }
-
-  private async getLearningStyle(userId: string): Promise<string> {
-    // This would integrate with the actual learning style detection
-    return 'adaptive';
-  }
-
-  private async getExamTarget(userId: string): Promise<string | undefined> {
-    try {
-      const { data, error } = await supabase
-        .from('knowledge_base')
-        .select('content')
-        .eq('fact_type', 'exam_target')
-        .limit(1)
-        .single();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      
-      return (data as any)?.content;
-    } catch (error) {
-      logWarning('Failed to get exam target', { userId, error });
-      return undefined;
-    }
-  }
-
-  private async getRelevantMemories(userId: string, query: string): Promise<Array<{description: string, relevance: number}>> {
-    try {
-      const { data, error } = await supabase
-        .from('conversation_memory')
-        .select('interaction_data, memory_relevance_score')
-        .eq('user_id', userId)
-        .order('memory_relevance_score', { ascending: false })
-        .limit(5);
-
-      if (error) throw error;
-      
-      if (data && Array.isArray(data)) {
-        return data.map(d => {
-          const interactionData = (d as any).interaction_data;
-          const relevance = (d as any).memory_relevance_score;
-          return {
-            description: interactionData?.summary || 'Learning session',
-            relevance: typeof relevance === 'number' ? relevance : 0.5
-          };
-        });
-      }
-      
-      return [];
-    } catch (error) {
-      logWarning('Failed to get relevant memories', { userId, error });
-      return [];
-    }
-  }
-
-  private async getDetailedPreferences(userId: string): Promise<StudyPreferences | null> {
-    // This would integrate with user preference storage
     return {
-      difficulty: 'Medium',
-      sessionDuration: 60,
-      breakInterval: 15,
-      preferredTime: 'evening',
-      topics: [],
-      studyMethods: []
+      total,
+      profile: profileTokens,
+      knowledge: knowledgeTokens,
+      history: historyTokens,
+      sources: sourcesTokens,
+      remaining: Math.max(0, remaining)
     };
   }
 
-  private createFallbackContext(request: ContextOptimizationRequest, optimizationTime: number): ContextOptimizationResult {
-    return {
-      context: 'Student learning actively. Context optimization temporarily unavailable.',
-      tokenCount: 15,
-      level: request.requiredLevel,
-      compressionApplied: false,
-      optimizationTime,
-      relevanceScore: 0.5,
-      cacheHit: false,
-      metadata: {
-        topics: [],
-        subjects: [],
-        difficulty: 'Medium',
-        accuracy: 0,
-        lastActivity: new Date(),
-        learningStyle: 'adaptive',
-        cacheKey: this.generateCacheKey(request)
+  /**
+   * Optimize context for token limit
+   */
+  private async optimizeForTokenLimit(
+    context: Omit<EnhancedContext, 'compressionLevel' | 'tokenUsage' | 'lastOptimized'>,
+    tokenLimit: number,
+    targetLevel: ContextLevel
+  ): Promise<Omit<EnhancedContext, 'compressionLevel' | 'tokenUsage' | 'lastOptimized'>> {
+    const levelConfig = EnhancedContextBuilder.CONTEXT_LEVELS[targetLevel];
+    let optimizedContext = { ...context };
+
+    // Start with most compressible elements
+    let currentTokens = this.calculateTokenUsage(optimizedContext).total;
+    let compressionRatio = levelConfig.compressionRatio;
+
+    // Compress knowledge base first (highest impact)
+    if (currentTokens > tokenLimit * 0.8) {
+      const targetKnowledgeTokens = tokenLimit * 0.3;
+      const compressionFactor = targetKnowledgeTokens / optimizedContext.knowledgeBase.length;
+      optimizedContext.knowledgeBase = optimizedContext.knowledgeBase
+        .sort((a, b) => b.educationalValue - a.educationalValue)
+        .slice(0, Math.floor(optimizedContext.knowledgeBase.length * compressionFactor))
+        .map(entry => ({
+          ...entry,
+          content: this.compressContent(entry.content, compressionRatio)
+        }));
+      
+      currentTokens = this.calculateTokenUsage(optimizedContext).total;
+    }
+
+    // Compress conversation history
+    if (currentTokens > tokenLimit * 0.9) {
+      const targetHistoryTokens = tokenLimit * 0.2;
+      const compressionFactor = targetHistoryTokens / optimizedContext.conversationHistory.length;
+      optimizedContext.conversationHistory = optimizedContext.conversationHistory
+        .sort((a, b) => b.qualityScore - a.qualityScore)
+        .slice(0, Math.floor(optimizedContext.conversationHistory.length * compressionFactor))
+        .map(summary => ({
+          ...summary,
+          summary: this.compressContent(summary.summary, compressionRatio * 0.8)
+        }));
+      
+      currentTokens = this.calculateTokenUsage(optimizedContext).total;
+    }
+
+    // Compress sources if still over limit
+    if (currentTokens > tokenLimit) {
+      const targetSourceTokens = tokenLimit * 0.1;
+      const compressionFactor = targetSourceTokens / optimizedContext.externalSources.length;
+      optimizedContext.externalSources = optimizedContext.externalSources
+        .sort((a, b) => b.educationalRelevance - a.educationalRelevance)
+        .slice(0, Math.floor(optimizedContext.externalSources.length * compressionFactor))
+        .map(source => ({
+          ...source,
+          content: this.compressContent(source.content, compressionRatio * 0.6)
+        }));
+    }
+
+    return optimizedContext;
+  }
+
+  /**
+   * Utility methods
+   */
+  private extractLearningStyle(preferences: any, activity: any[]): LearningStyle {
+  const prefStyle = (preferences as any)?.learning_style || 'reading_writing';
+  const stepByStep = activity.length > 10;
+  const examplesFirst = activity.some(a => a.topic?.includes('example'));
+  
+  return {
+    type: prefStyle as any,
+    preferences: {
+      stepByStep,
+      examplesFirst,
+      abstractConcepts: !stepByStep,
+      practicalApplication: true
+    },
+    adaptiveFactors: {
+      difficultyRamp: 'adaptive' as any,
+      explanationDepth: 'adaptive' as any,
+      questionFrequency: 'medium' as any
+    }
+  };
+}
+
+  private extractStrongSubjects(activity: any[]): string[] {
+    const subjectPerformance: Record<string, { correct: number; total: number }> = {};
+    
+    activity.forEach(session => {
+      const subject = session.subject;
+      if (!subjectPerformance[subject]) {
+        subjectPerformance[subject] = { correct: 0, total: 0 };
       }
+      subjectPerformance[subject].total++;
+      if (session.accuracy > 0.8) {
+        subjectPerformance[subject].correct++;
+      }
+    });
+
+    return Object.entries(subjectPerformance)
+      .filter(([_, stats]) => stats.total > 0 && stats.correct / stats.total > 0.8)
+      .map(([subject]) => subject)
+      .slice(0, 5);
+  }
+
+  private extractWeakSubjects(activity: any[]): string[] {
+    const subjectPerformance: Record<string, { correct: number; total: number }> = {};
+    
+    activity.forEach(session => {
+      const subject = session.subject;
+      if (!subjectPerformance[subject]) {
+        subjectPerformance[subject] = { correct: 0, total: 0 };
+      }
+      subjectPerformance[subject].total++;
+      if (session.accuracy < 0.6) {
+        subjectPerformance[subject].correct++;
+      }
+    });
+
+    return Object.entries(subjectPerformance)
+      .filter(([_, stats]) => stats.total > 0 && stats.correct / stats.total > 0.5)
+      .map(([subject]) => subject)
+      .slice(0, 5);
+  }
+
+  private extractComplexityLevel(preferences: any, activity: any[]): ComplexityLevel {
+    const avgDifficulty = activity.length > 0
+      ? activity.reduce((sum, a) => sum + (a.difficulty || 3), 0) / activity.length
+      : 3;
+    
+    const preferred = (preferences as any)?.preferred_difficulty || Math.round(avgDifficulty) || 3;
+    
+    return {
+      current: Math.min(5, Math.max(1, Math.round(avgDifficulty))) as 1 | 2 | 3 | 4 | 5,
+      preferred: Math.min(5, Math.max(1, preferred)) as 1 | 2 | 3 | 4 | 5,
+      adaptiveRange: [Math.max(1, preferred - 1), Math.min(5, preferred + 1)] as [number, number]
     };
   }
 
-  private createFallbackStudentContext(userId: string): StudentStudyContext {
+  private extractRecentTopics(activity: any[]): string[] {
+    return activity
+      .filter(a => a.topic)
+      .slice(0, 10)
+      .map(a => a.topic)
+      .filter((topic, index, arr) => arr.indexOf(topic) === index);
+  }
+
+  private calculateStudyProgress(activity: any[]): StudyProgress {
+    const totalTopics = activity.length;
+    const completedTopics = activity.filter(a => a.completed).length;
+    const avgAccuracy = activity.length > 0 
+      ? activity.reduce((sum, a) => sum + (a.accuracy || 0), 0) / activity.length
+      : 0;
+    const totalTime = activity.reduce((sum, a) => sum + (a.duration || 0), 0);
+
+    return {
+      totalTopics,
+      completedTopics,
+      masteryLevel: avgAccuracy * 100,
+      accuracy: avgAccuracy * 100,
+      timeSpent: totalTime,
+      lastActivity: activity[0]?.created_at ? new Date(activity[0].created_at) : new Date(),
+      improvementRate: totalTopics / 4 // assuming 4 weeks
+    };
+  }
+
+  private extractLearningObjectives(activity: any[]): string[] {
+    return activity
+      .filter(a => a.learning_objective)
+      .map(a => a.learning_objective)
+      .filter((obj, index, arr) => arr.indexOf(obj) === index)
+      .slice(0, 5);
+  }
+
+  private generateLastSessionSummary(activity: any[]): string {
+    if (activity.length === 0) return 'No recent activity';
+    
+    const lastSession = activity[0];
+    return `Studied ${lastSession.subject}${lastSession.topic ? ` - ${lastSession.topic}` : ''} for ${Math.round((lastSession.duration || 0) / 60)} minutes with ${Math.round((lastSession.accuracy || 0) * 100)}% accuracy`;
+  }
+
+  private calculateCompressedMetadata(activity: any[], gamification: any): any {
+    return {
+      totalSessions: activity.length,
+      averageSessionTime: activity.length > 0 
+        ? activity.reduce((sum, a) => sum + (a.duration || 0), 0) / activity.length 
+        : 0,
+      mostStudiedSubject: this.getMostStudiedSubject(activity),
+      learningVelocity: activity.length / 4, // sessions per week
+      attentionSpan: this.calculateAverageAttentionSpan(activity)
+    };
+  }
+
+  private getMostStudiedSubject(activity: any[]): string {
+    const subjectCount: Record<string, number> = {};
+    activity.forEach(a => {
+      const subject = a.subject || 'Unknown';
+      subjectCount[subject] = (subjectCount[subject] || 0) + 1;
+    });
+    
+    return Object.entries(subjectCount)
+      .sort(([,a], [,b]) => b - a)[0]?.[0] || 'Unknown';
+  }
+
+  private calculateAverageAttentionSpan(activity: any[]): number {
+    const durations = activity.map(a => a.duration).filter(d => d > 0);
+    return durations.length > 0 
+      ? durations.reduce((sum, d) => sum + d, 0) / durations.length 
+      : 0;
+  }
+
+  private createDefaultProfile(userId: string): UltraCompressedProfile {
     return {
       userId,
-      profileText: 'Active student learner',
+      learningStyle: {
+        type: 'reading_writing',
+        preferences: {
+          stepByStep: true,
+          examplesFirst: true,
+          abstractConcepts: false,
+          practicalApplication: true
+        },
+        adaptiveFactors: {
+          difficultyRamp: 'adaptive',
+          explanationDepth: 'adaptive',
+          questionFrequency: 'medium'
+        }
+      },
       strongSubjects: [],
       weakSubjects: [],
-      recentActivity: {
-        questionsAnswered: 0,
-        correctAnswers: 0,
-        topicsStruggled: [],
-        topicsStrong: []
+      currentLevel: 1,
+      streakDays: 0,
+      totalPoints: 0,
+      preferredComplexity: {
+        current: 3,
+        preferred: 3,
+        adaptiveRange: [2, 4]
       },
+      recentTopics: [],
       studyProgress: {
         totalTopics: 0,
         completedTopics: 0,
+        masteryLevel: 0,
         accuracy: 0,
-        subjectsStudied: [],
-        timeSpent: 0
+        timeSpent: 0,
+        lastActivity: new Date(),
+        improvementRate: 0
       },
-      preferences: {
-        difficulty: 'Medium',
-        subjects: [],
-        studyGoals: ['Learning and improvement']
-      },
-      currentData: {
-        streak: 0,
-        level: 1,
-        points: 0,
-        revisionQueue: 0,
-        pendingTopics: []
+      learningObjectives: [],
+      lastSessionSummary: 'No recent activity',
+      compressedMetadata: {
+        totalSessions: 0,
+        averageSessionTime: 0,
+        mostStudiedSubject: 'Unknown',
+        learningVelocity: 0,
+        attentionSpan: 0
       }
     };
   }
 
-  /**
-   * Public utility methods
-   */
-  getContextLevels(): ContextLevelConfig[] {
-    return [...EnhancedContextBuilder.CONTEXT_LEVELS];
-  }
-
-  getCacheStats(): { size: number; maxSize: number; hitRate: number } {
-    return {
-      size: this.cacheSize,
-      maxSize: EnhancedContextBuilder.MAX_CACHE_SIZE,
-      hitRate: 0.8 // This would be calculated from actual metrics
+  private mapContentType(type: string): EducationalContent {
+    const typeMap: Record<string, EducationalContent> = {
+      'fact': 'facts',
+      'concept': 'concepts',
+      'procedure': 'procedures',
+      'example': 'examples',
+      'reference': 'references'
     };
+    return typeMap[type] || 'facts';
   }
 
-  clearCache(): void {
-    this.contextCache.clear();
-    this.cacheSize = 0;
-    logInfo('Context cache cleared', {
-      componentName: 'EnhancedContextBuilder'
-    });
+  private mapSourceType(type: string): EducationalSource['type'] {
+    const typeMap: Record<string, EducationalSource['type']> = {
+      'textbook': 'textbook' as any,
+      'website': 'website' as any,
+      'paper': 'academic_paper' as any,
+      'document': 'official_doc' as any,
+      'verified': 'verified_content' as any
+    };
+    return typeMap[type] || 'verified_content' as any;
+  }
+
+  private estimateTokens(text: string): number {
+    // Rough estimation: 1 token ≈ 4 characters for English text
+    return Math.ceil(text.length / 4);
+  }
+
+  private compressContent(content: string, ratio: number): string {
+    if (ratio >= 1.0) return content;
+    
+    const sentences = content.split(/[.!?]+/);
+    const targetSentences = Math.max(1, Math.floor(sentences.length * ratio));
+    
+    return sentences
+      .slice(0, targetSentences)
+      .join('. ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private startCacheCleanup(): void {
+    setInterval(() => {
+      const now = new Date();
+      for (const [key, cached] of this.profileCache.entries()) {
+        if (cached.expiresAt <= now) {
+          this.profileCache.delete(key);
+        }
+      }
+    }, 60000); // Clean up every minute
   }
 
   /**
-   * Cleanup on instance destruction
+   * Clear caches
    */
-  destroy(): void {
-    if (this.cacheCleanupInterval) {
-      clearInterval(this.cacheCleanupInterval);
-    }
-    this.clearCache();
+  clearCaches(): void {
+    this.knowledgeBaseCache.clear();
+    this.profileCache.clear();
   }
 }
 
@@ -1130,14 +942,5 @@ export class EnhancedContextBuilder {
 export const enhancedContextBuilder = new EnhancedContextBuilder();
 
 // Convenience functions
-export const buildEnhancedContext = (request: ContextOptimizationRequest) => 
-  enhancedContextBuilder.buildEnhancedContext(request);
-
-export const getContextLevels = () => 
-  enhancedContextBuilder.getContextLevels();
-
-export const getCacheStats = () => 
-  enhancedContextBuilder.getCacheStats();
-
-export const clearContextCache = () => 
-  enhancedContextBuilder.clearCache();
+export const buildEnhancedContext = (request: ContextBuildRequest) => 
+  enhancedContextBuilder.buildContext(request);
