@@ -89,6 +89,7 @@ export default function StudyBuddy({ userId, className }: StudyBuddyProps) {
   const [aiFeaturesData, setAiFeaturesData] = useState<any>(null);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [errorBanner, setErrorBanner] = useState<{visible:boolean; message:string; lastPrompt?:string} | null>(null);
+  const [memoryStatus, setMemoryStatus] = useState<{isStoring:boolean; isRetrieving:boolean; lastMemoryFound?:number} | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -189,16 +190,27 @@ export default function StudyBuddy({ userId, className }: StudyBuddyProps) {
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      // Use the regular send endpoint (not streaming) that has memory context
-      const res = await fetch('/api/chat/study-assistant/send', {
+      // Set memory status indicators
+      setMemoryStatus({ isStoring: false, isRetrieving: true });
+      
+      // Use the new unified AI chat endpoint that handles memory automatically
+      const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
-          conversationId: currentConversation?.id,
           message: messageText,
+          conversationId: currentConversation?.id,
           chatType: 'study_assistant',
-          isPersonalQuery
+          includeMemoryContext: true,
+          includePersonalizedSuggestions: true,
+          memoryOptions: {
+            query: isPersonalQuery ? messageText : undefined,
+            limit: 5,
+            minSimilarity: 0.1,
+            searchType: 'hybrid',
+            contextLevel: 'balanced'
+          }
         })
       });
 
@@ -209,26 +221,52 @@ export default function StudyBuddy({ userId, className }: StudyBuddyProps) {
       const data = await res.json();
       
       if (!data.success) {
-        throw new Error(data.error || 'Failed to get response');
+        throw new Error(data.error?.message || 'Failed to get response');
       }
+
+      // Update memory status with results
+      setMemoryStatus({
+        isStoring: false,
+        isRetrieving: false,
+        lastMemoryFound: data.data.memoryContext?.memoriesFound || 0
+      });
 
       // Add AI response
       const aiMessage: ChatMessage = {
         id: `ai-${Date.now()}`,
         role: 'assistant',
-        content: data.data.response.content,
+        content: data.data.aiResponse.content,
         timestamp: new Date().toISOString(),
-        model_used: data.data.response.model_used,
-        provider_used: data.data.response.provider_used,
-        tokens_used: data.data.response.tokens_used,
-        latency_ms: data.data.response.latency_ms
+        model_used: data.data.aiResponse.model_used,
+        provider_used: data.data.aiResponse.provider_used,
+        tokens_used: data.data.aiResponse.tokens_used?.output || 0,
+        latency_ms: data.data.aiResponse.latency_ms
       };
 
       setMessages(prev => [...prev, aiMessage]);
 
       // Update conversation if needed
-      if (data.data.conversationId && !currentConversation) {
-        setCurrentConversation({ id: data.data.conversationId });
+      if (data.data.aiResponse.conversationId && !currentConversation) {
+        setCurrentConversation({ id: data.data.aiResponse.conversationId });
+      }
+
+      // Update memory references if memory context was found
+      if (data.data.memoryContext && data.data.memoryContext.memoriesFound > 0) {
+        const memoryRefs = data.data.memoryContext.searchResults.memories.map((memory: any) => ({
+          id: memory.id,
+          content: memory.content,
+          similarity: memory.similarity,
+          created_at: memory.created_at,
+          importance_score: Math.round(memory.relevanceScore * 5), // Convert to 1-5 scale
+          tags: memory.tags || []
+        }));
+        
+        // Update memory references in the sidebar
+        setMemoryReferences(prev => {
+          const existingIds = new Set(prev.map(m => m.id));
+          const newRefs = memoryRefs.filter(m => !existingIds.has(m.id));
+          return [...newRefs, ...prev].slice(0, 10); // Keep max 10
+        });
       }
 
       setErrorBanner(null);
@@ -236,6 +274,9 @@ export default function StudyBuddy({ userId, className }: StudyBuddyProps) {
       console.error('Failed to send message:', error);
       setMessages(prev => prev.filter(m => m.id !== userMessage.id));
       setErrorBanner({ visible: true, message: (error instanceof Error ? error.message : 'Failed to get response'), lastPrompt: messageText });
+      
+      // Reset memory status on error
+      setMemoryStatus(null);
       
       const errorMessage: ChatMessage = {
         id: `error-${Date.now()}`,
@@ -246,6 +287,8 @@ export default function StudyBuddy({ userId, className }: StudyBuddyProps) {
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      // Clear memory status after a short delay
+      setTimeout(() => setMemoryStatus(null), 2000);
     }
   };
 
@@ -521,7 +564,32 @@ export default function StudyBuddy({ userId, className }: StudyBuddyProps) {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {/* Streaming controls removed - now using regular API */}
+              {/* Memory status indicator */}
+              {memoryStatus && (
+                <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-950/20 rounded-md text-xs">
+                  {memoryStatus.isRetrieving && (
+                    <>
+                      <Brain className="h-3 w-3 animate-pulse" />
+                      <span className="text-blue-600 dark:text-blue-400">Searching memory...</span>
+                    </>
+                  )}
+                  {memoryStatus.isStoring && (
+                    <>
+                      <CheckCircle className="h-3 w-3" />
+                      <span className="text-green-600 dark:text-green-400">Storing memory...</span>
+                    </>
+                  )}
+                  {!memoryStatus.isRetrieving && !memoryStatus.isStoring && memoryStatus.lastMemoryFound !== undefined && (
+                    <>
+                      <Star className="h-3 w-3 text-purple-500" />
+                      <span className="text-purple-600 dark:text-purple-400">
+                        {memoryStatus.lastMemoryFound > 0 ? `Found ${memoryStatus.lastMemoryFound} memories` : 'No memory found'}
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+              
               <Button
                 variant="outline"
                 size="sm"

@@ -1,0 +1,9 @@
+{
+  "userId": "123e4567-e89b-12d3-a456-426614174000",
+  "context": "Study for upcoming mathematics exam",
+  "preferences": {
+    "subjects": ["mathematics", "physics"],
+    "timeAvailable": 90,
+    "currentMood": "confident"
+  }
+}

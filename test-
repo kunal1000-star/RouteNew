@@ -1,0 +1,128 @@
+// AI Memory Storage Endpoint Test Script
+// =====================================
+
+const testMemoryStorage = async () => {
+  const baseUrl = 'http://localhost:3000/api/ai/memory-storage';
+  
+  console.log('🧪 Testing AI Memory Storage Endpoint...\n');
+
+  // Test 1: Health Check
+  console.log('1. Testing health check...');
+  try {
+    const healthResponse = await fetch(`${baseUrl}?action=health`);
+    const healthData = await healthResponse.json();
+    
+    if (healthData.success) {
+      console.log('✅ Health check passed');
+      console.log('   Status:', healthData.data.status);
+      console.log('   Database connected:', healthData.data.system.database.connected);
+    } else {
+      console.log('❌ Health check failed:', healthData.error);
+    }
+  } catch (error) {
+    console.log('❌ Health check error:', error.message);
+  }
+
+  console.log('\n2. Testing memory storage...');
+  
+  // Test 2: Memory Storage with full metadata
+  const testPayload = {
+    userId: "123e4567-e89b-12d3-a456-426614174000",
+    message: "What is photosynthesis?",
+    response: "Photosynthesis is the process by which plants convert light energy into chemical energy, producing glucose and oxygen from carbon dioxide and water.",
+    conversationId: "conv-test-123",
+    metadata: {
+      memoryType: "ai_response",
+      priority: "medium",
+      retention: "long_term",
+      topic: "biology",
+      subject: "science",
+      provider: "groq",
+      model: "llama-3.3-70b-versatile",
+      tokensUsed: 150,
+      processingTime: 1200,
+      confidenceScore: 0.9,
+      tags: ["photosynthesis", "biology", "plants"],
+      sessionId: "session-456"
+    }
+  };
+
+  try {
+    const storageResponse = await fetch(baseUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(testPayload)
+    });
+    
+    const storageData = await storageResponse.json();
+    
+    if (storageData.success) {
+      console.log('✅ Memory storage successful');
+      console.log('   Memory ID:', storageData.data.memoryId);
+      console.log('   Quality Score:', storageData.data.qualityScore);
+      console.log('   Relevance Score:', storageData.data.relevanceScore);
+      console.log('   Memory Type:', storageData.data.memoryType);
+      console.log('   Processing Time:', storageData.metadata.processingTime, 'ms');
+    } else {
+      console.log('❌ Memory storage failed:', storageData.error);
+    }
+  } catch (error) {
+    console.log('❌ Memory storage error:', error.message);
+  }
+
+  console.log('\n3. Testing error handling...');
+  
+  // Test 3: Error handling - missing required fields
+  const invalidPayload = {
+    userId: "123e4567-e89b-12d3-a456-426614174000"
+    // Missing message and response
+  };
+
+  try {
+    const errorResponse = await fetch(baseUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(invalidPayload)
+    });
+    
+    const errorData = await errorResponse.json();
+    
+    if (!errorData.success && errorData.error.code === 'INVALID_REQUEST') {
+      console.log('✅ Error handling working correctly');
+      console.log('   Error Code:', errorData.error.code);
+      console.log('   Error Message:', errorData.error.message);
+    } else {
+      console.log('❌ Error handling not working as expected');
+    }
+  } catch (error) {
+    console.log('❌ Error handling test failed:', error.message);
+  }
+
+  console.log('\n4. Testing API information endpoint...');
+  
+  // Test 4: API info endpoint
+  try {
+    const infoResponse = await fetch(baseUrl);
+    const infoData = await infoResponse.json();
+    
+    if (infoData.success) {
+      console.log('✅ API information endpoint working');
+      console.log('   Endpoint:', infoData.data.endpoint);
+      console.log('   Version:', infoData.data.version);
+    } else {
+      console.log('❌ API information endpoint failed:', infoData.error);
+    }
+  } catch (error) {
+    console.log('❌ API information error:', error.message);
+  }
+
+  console.log('\n🎯 AI Memory Storage Endpoint Testing Complete!');
+};
+
+// Export for use
+export { testMemoryStorage };
+
+// Run tests if called directly
+if (typeof window === 'undefined') {
+  testMemoryStorage().catch(console.error);
+}

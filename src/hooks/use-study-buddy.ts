@@ -71,6 +71,9 @@ export interface EnhancedStudyBuddyState extends StudyBuddyState {
 }
 
 export interface EnhancedStudyBuddyActions extends StudyBuddyActions {
+  // Session management
+  initializeSession: () => Promise<void>;
+  
   // Enhanced context building methods
   buildEnhancedStudyContext: (level?: ContextLevel) => Promise<EnhancedContext>;
   getRelevantStudyMemories: (query?: string, limit?: number) => Promise<MemorySearchResult[]>;
@@ -583,37 +586,17 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
       const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       const serverConversationIdToSend = currentConversationId && UUID_REGEX.test(currentConversationId) ? currentConversationId : undefined;
 
-      // Call Study Assistant API endpoint with enhanced context
+      // Call the Study Buddy specific API endpoint that has proper memory integration
       const requestBody: any = {
-        userId,
         conversationId: serverConversationIdToSend,
         message: content,
         chatType: 'study_assistant',
-        operation: 'chat',
-        sessionId,
-        context: {
-          studyContext,
-          userProfile: profileData || null,
-          learningGoals: preferences?.learningGoals || [],
-          difficulty: (preferences as any)?.difficulty || 'intermediate',
-        },
-        optimizationOptions: {
-          enableCaching: true,
-          enableLoadBalancing: true,
-          enableParameterTuning: true,
-          enableProviderOptimization: true,
-          enableContextOptimization: true,
-          performanceTarget: 'balanced' as const,
-          maxOptimizationTime: 2000,
-        },
-        // Layer 2 data passthrough (optional):
-        enhancedContext: enhancedContextForRequest,
-        knowledgeBase: knowledgeResults,
-        relevantMemories: memoryResults,
+        isPersonalQuery: isPersonalQuery,
+        provider: preferences.provider
       };
 
       if (preferences.streamResponses) {
-        // Handle streaming response
+        // Handle streaming response using the Study Buddy specific endpoint
         const assistantMessageId = addMessage({
           role: 'assistant',
           content: '',
@@ -630,6 +613,8 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
             router.push('/auth');
             return;
           }
+          
+          // Use the Study Buddy specific endpoint with memory integration
           const response = await fetch('/api/study-buddy', {
             method: 'POST',
             headers: {
@@ -643,7 +628,7 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
             throw new Error(`HTTP error! status: ${response.status}`);
           }
 
-          const data: StudyBuddyApiResponse = await response.json();
+          const data = await response.json();
 
           // Sync local conversationId with server-assigned UUID
           if (data?.data?.conversationId) {
@@ -651,24 +636,24 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
           }
 
           if (data.success && data.data && data.data.response) {
-            console.log('✅ Setting assistant message from API response');
+            console.log('✅ Setting assistant message from Study Buddy API with memory');
             
-            // Store the interaction in memory
-            await storeStudyInteraction(content, data.data.response.content, {
-              qualityScore: (data as any).layer1Results?.classification?.confidence || 0.5
-            });
+            // Update memory references if memory context was found
+            if (data.data.memoryContext && data.data.memoryContext.memoriesFound > 0) {
+              console.log(`Memory: Found ${data.data.memoryContext.memoriesFound} relevant memories for personalized response`);
+            }
 
             updateMessage(assistantMessageId, {
               content: data.data.response.content,
               provider: data.data.response.provider_used,
               model: data.data.response.model_used,
-              tokensUsed: data.data.response.tokens_used?.output || 0,
+              tokensUsed: (data.data.response.tokens_used?.output || 0) + (data.data.response.tokens_used?.input || 0),
               streaming: false,
-              memory_references: data.data.response.memory_references
+              memory_references: data.data.response.memory_references || []
             });
           } else {
-            console.log('⚠️  API response not successful, using fallback response');
-            const errorMessage = data.error || 'I apologize, but I encountered an issue processing your request. Please try again, and I\'ll do my best to help you with your studies!';
+            console.log('⚠️  Study Buddy API response not successful, using fallback response');
+            const errorMessage = data.error?.message || 'I apologize, but I encountered an issue processing your request. Please try again, and I\'ll do my best to help you with your studies!';
             updateMessage(assistantMessageId, {
               content: errorMessage,
               streaming: false,
@@ -676,7 +661,7 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
           }
 
         } catch (streamError) {
-          console.error('Study Assistant API failed:', streamError);
+          console.error('Study Buddy API failed:', streamError);
 
           // Add error message to chat
           const errorMessage = streamError instanceof Error ? streamError.message : String(streamError);
@@ -686,7 +671,7 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
           });
         }
       } else {
-        // Handle regular (non-streaming) response
+        // Handle regular (non-streaming) response using the Study Buddy specific endpoint
         const session2 = await supabaseBrowserClient.auth.getSession();
         const accessToken2 = session2.data.session?.access_token;
         if (!accessToken2) {
@@ -695,6 +680,8 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
           router.push('/auth');
           return;
         }
+        
+        // Use the Study Buddy specific endpoint with memory integration
         const response = await fetch('/api/study-buddy', {
           method: 'POST',
           headers: {
@@ -708,7 +695,7 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const data: StudyBuddyApiResponse = await response.json();
+        const data = await response.json();
 
         // Sync local conversationId with server-assigned UUID
         if (data?.data?.conversationId) {
@@ -716,24 +703,24 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
         }
 
         if (data.success && data.data && data.data.response) {
-          console.log('✅ Setting assistant message from API response (non-streaming)');
+          console.log('✅ Setting assistant message from Study Buddy API with memory (non-streaming)');
           
-          // Store the interaction in memory
-          await storeStudyInteraction(content, data.data.response.content, {
-            qualityScore: (data as any).layer1Results?.classification?.confidence || 0.5
-          });
+          // Update memory references if memory context was found
+          if (data.data.memoryContext && data.data.memoryContext.memoriesFound > 0) {
+            console.log(`Memory: Found ${data.data.memoryContext.memoriesFound} relevant memories for personalized response`);
+          }
 
           addMessage({
             role: 'assistant',
             content: data.data.response.content,
             provider: data.data.response.provider_used,
             model: data.data.response.model_used,
-            tokensUsed: data.data.response.tokens_used?.output || 0,
-            memory_references: data.data.response.memory_references
+            tokensUsed: (data.data.response.tokens_used?.output || 0) + (data.data.response.tokens_used?.input || 0),
+            memory_references: data.data.response.memory_references || []
           });
         } else {
-          console.log('⚠️  API response not successful, using fallback response (non-streaming)');
-          const errorMessage = data.error || 'I apologize, but I encountered an issue processing your request. Please try again, and I\'ll do my best to help you with your studies!';
+          console.log('⚠️  Study Buddy API response not successful, using fallback response (non-streaming)');
+          const errorMessage = data.error?.message || 'I apologize, but I encountered an issue processing your request. Please try again, and I\'ll do my best to help you with your studies!';
           addMessage({
             role: 'assistant',
             content: errorMessage,

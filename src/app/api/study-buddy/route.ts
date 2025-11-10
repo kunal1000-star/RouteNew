@@ -1,7 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { aiServiceManager } from '@/lib/ai/ai-service-manager-unified';
 import { memoryContextProvider } from '@/lib/ai/memory-context-provider';
-import type { StudyBuddyApiRequest, StudyBuddyApiResponse } from '@/types/study-buddy';
+import { createClient } from '@supabase/supabase-js';
+import type { Database } from '@/lib/database.types';
+
+// Helper function to get authenticated Supabase client
+function getDbForRequest(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.substring(7);
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { headers: { Authorization: `Bearer ${token}` } } }
+  );
+}
+
+// Personal query detection
+function detectPersonalQuestion(message: string): boolean {
+  const personalKeywords = [
+    'my', 'me', 'my name', 'do you know', 'who am i', 'what is my',
+    'my account', 'my profile', 'my progress', 'my grade',
+    'my score', 'my performance', 'my results', 'personal', 'my data',
+    'kaise', 'mera', 'meri', 'main', 'mujhe', 'maine bola'
+  ];
+  
+  return personalKeywords.some(keyword =>
+    message.toLowerCase().includes(keyword)
+  );
+}
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -10,88 +36,98 @@ export async function POST(request: NextRequest) {
   try {
     console.log(`[${requestId}] Processing study buddy request`);
 
-    // Parse request body and save for error handling
+    // Parse request body
     const body = await request.json() as any;
+    const { conversationId, message, chatType, isPersonalQuery, provider } = body;
 
-    // Detect if this is a personal question
-    const isPersonalQuery = body.message?.toLowerCase().includes('my name') ||
-                           body.message?.toLowerCase().includes('do you know') ||
-                           body.message?.toLowerCase().includes('who am i') ||
-                           body.message?.toLowerCase().includes('what is my');
-
-    // Validate required fields (conversationId is optional - will be generated if not provided)
-    if (!body.userId || !body.message || !body.operation) {
+    // Validate required fields
+    if (!message || !chatType) {
       return NextResponse.json({
         success: false,
-        error: {
-          code: 'INVALID_REQUEST',
-          message: 'Missing required fields: userId, message, operation'
-        }
+        error: 'Missing required fields: message, chatType'
       }, { status: 400 });
     }
 
-    // Generate conversationId if not provided
-    if (!body.conversationId) {
-      body.conversationId = `conv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    // Get authenticated user
+    const dbAuth = getDbForRequest(request);
+    if (!dbAuth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    // Only handle 'chat' operation for now
-    if (body.operation !== 'chat') {
-      return NextResponse.json({
-        success: false,
-        error: {
-          code: 'UNSUPPORTED_OPERATION',
-          message: 'Only "chat" operation is currently supported'
-        }
-      }, { status: 400 });
+    const { data: authData, error: authError } = await dbAuth.auth.getUser();
+    if (authError || !authData?.user) {
+      return NextResponse.json({ error: 'Unauthorized: invalid or missing token' }, { status: 401 });
     }
+    const userId = authData.user.id;
 
-    // Get memory context for personal queries
-    let memoryContext = '';
-    if (isPersonalQuery && body.userId && body.message) {
-      try {
-        console.log(`[${requestId}] Getting memory context for personal query`);
-        const memoryResult = await memoryContextProvider.getMemoryContext({
-          userId: body.userId,
-          query: body.message,
-          chatType: 'study_assistant',
-          isPersonalQuery: true,
-          contextLevel: 'comprehensive',
-          limit: 8
-        });
-        
-        if (memoryResult.contextString) {
-          memoryContext = memoryResult.contextString;
-          console.log(`[${requestId}] Found ${memoryResult.memories.length} relevant memories`);
-        }
-      } catch (memoryError) {
-        console.warn(`[${requestId}] Failed to get memory context:`, memoryError);
-      }
-    }
+    // Determine if this is a personal query
+    const actualIsPersonalQuery = isPersonalQuery || detectPersonalQuestion(message);
 
-    // Create study request for AI service manager
-    const studyRequest: StudyBuddyApiRequest = {
-      userId: body.userId,
-      conversationId: body.conversationId,
-      message: body.message,
-      chatType: 'study_assistant'
+    // Get memory context for this query
+    let memoryContext = {
+      memories: [] as any[],
+      contextString: '',
+      personalFacts: [] as string[],
+      searchStats: { totalFound: 0, searchTimeMs: 0, provider: 'cohere' as any }
     };
 
-    // Enhanced message with memory context for personal queries
-    let enhancedMessage = body.message;
-    if (isPersonalQuery && memoryContext) {
-      enhancedMessage = `${memoryContext}\n\nUser's current question: ${body.message}`;
-      console.log(`[${requestId}] Enhanced message with memory context (${memoryContext.length} chars)`);
+    try {
+      memoryContext = await memoryContextProvider.getMemoryContext({
+        userId,
+        query: message,
+        chatType: chatType,
+        isPersonalQuery: actualIsPersonalQuery,
+        contextLevel: actualIsPersonalQuery ? 'comprehensive' : 'balanced',
+        limit: actualIsPersonalQuery ? 8 : 5
+      });
+    } catch (memoryError) {
+      console.warn('Failed to get memory context, proceeding without:', memoryError);
+      // Continue without memory context if it fails
     }
 
-    // Process through AI service manager
-    const aiResponse = await aiServiceManager.processQuery({
-      userId: studyRequest.userId,
-      conversationId: studyRequest.conversationId,
-      message: enhancedMessage,
-      chatType: studyRequest.chatType,
-      includeAppData: false
+    // Use the unified AI chat endpoint that handles memory automatically
+    const aiChatResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/ai/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Study-Buddy-API/1.0'
+      },
+      body: JSON.stringify({
+        userId,
+        message: memoryContext.contextString ?
+          `${memoryContext.contextString}\n\nCurrent question: ${message}` : message,
+        conversationId,
+        chatType: 'study_assistant',
+        includeMemoryContext: true,
+        includePersonalizedSuggestions: true,
+        memoryOptions: {
+          query: actualIsPersonalQuery ? message : undefined,
+          limit: 5,
+          minSimilarity: 0.1,
+          searchType: 'hybrid',
+          contextLevel: 'balanced'
+        }
+      })
     });
+
+    if (!aiChatResponse.ok) {
+      throw new Error(`AI chat failed: ${aiChatResponse.status} ${aiChatResponse.statusText}`);
+    }
+
+    const aiChatData = await aiChatResponse.json();
+
+    if (!aiChatData.success) {
+      throw new Error(aiChatData.error?.message || 'AI chat failed');
+    }
+
+    // Create memory references for the response
+    const memoryReferences = memoryContext.memories.map((memory: any, index: number) => ({
+      id: memory.id,
+      content: memory.content,
+      importance_score: memory.importance_score,
+      relevance: memory.similarity ? `${(memory.similarity * 100).toFixed(0)}%` : 'unknown',
+      tags: memory.tags || [],
+      created_at: memory.created_at
+    }));
 
     const processingTime = Date.now() - startTime;
 
@@ -99,55 +135,26 @@ export async function POST(request: NextRequest) {
       success: true,
       data: {
         response: {
-          content: aiResponse.content,
-          model_used: aiResponse.model_used,
-          provider_used: aiResponse.provider,
-          tokens_used: aiResponse.tokens_used,
-          latency_ms: aiResponse.latency_ms,
-          query_type: aiResponse.query_type,
-          web_search_enabled: aiResponse.web_search_enabled,
-          fallback_used: aiResponse.fallback_used,
-          cached: aiResponse.cached,
-          memory_references: memoryContext ? [`Memory context included: ${memoryContext.substring(0, 100)}...`] : []
+          content: aiChatData.data.aiResponse.content,
+          model_used: aiChatData.data.aiResponse.model_used,
+          provider_used: aiChatData.data.aiResponse.provider_used,
+          tokens_used: aiChatData.data.aiResponse.tokens_used,
+          latency_ms: aiChatData.data.aiResponse.latency_ms,
+          query_type: aiChatData.data.aiResponse.query_type,
+          web_search_enabled: aiChatData.data.aiResponse.web_search_enabled,
+          fallback_used: aiChatData.data.aiResponse.fallback_used,
+          cached: aiChatData.data.aiResponse.cached,
+          memory_references: memoryReferences
         },
-        conversationId: body.conversationId,
+        conversationId: conversationId || `conv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         timestamp: new Date().toISOString(),
-        layer5Data: {
-          orchestration: {
-            success: true,
-            layersProcessed: [2, 3], // AI service manager + memory integration
-            processingTime: processingTime,
-            optimizations: ['provider_fallback', ...(memoryContext ? ['memory_integration'] : [])]
-          },
-          performance: {
-            optimized: memoryContext ? true : false,
-            improvements: memoryContext ? ['memory_context_added'] : [],
-            cacheHitRate: 0
-          },
-          compliance: {
-            status: 'basic',
-            score: 80,
-            frameworksValidated: 0
-          },
-          monitoring: {
-            sessionActive: true,
-            healthStatus: 'healthy',
-            lastUpdate: new Date().toISOString()
-          }
-        },
-        metadata: {
-          processingTime: processingTime,
-          layersUsed: [2, ...(memoryContext ? [3] : [])],
-          optimizationsApplied: ['provider_fallback', ...(memoryContext ? ['memory_integration'] : [])],
-          complianceValidated: [],
-          systemHealth: 'healthy'
+        // Include memory context information
+        memoryContext: {
+          memoriesFound: memoryContext.memories.length,
+          searchTimeMs: memoryContext.searchStats.searchTimeMs,
+          personalFacts: memoryContext.personalFacts,
+          searchStats: memoryContext.searchStats
         }
-      },
-      monitoring: {
-        sessionActive: true,
-        healthStatus: 'healthy',
-        recommendations: memoryContext ? ['Memory context successfully integrated'] : [],
-        alerts: []
       }
     });
 
@@ -161,17 +168,6 @@ export async function POST(request: NextRequest) {
         code: 'INTERNAL_ERROR',
         message: 'An unexpected error occurred',
         details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      data: {
-        sessionId: 'error',
-        timestamp: new Date().toISOString(),
-        metadata: {
-          processingTime,
-          layersUsed: [],
-          optimizationsApplied: [],
-          complianceValidated: [],
-          systemHealth: 'error'
-        }
       }
     }, { status: 500 });
   }
