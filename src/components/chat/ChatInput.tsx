@@ -196,10 +196,10 @@ export default function ChatInput({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="h-11 w-11 opacity-0 group-hover:opacity-100 transition-opacity"
                 onClick={() => removeAttachment(attachment.id)}
               >
-                <X className="h-3 w-3" />
+                <X className="h-5 w-5" />
               </Button>
             </Card>
           ))}
@@ -216,9 +216,9 @@ export default function ChatInput({
             onClick={handleFileUpload}
             aria-label="Attach files"
             disabled={disabled || isRecording}
-            className="flex-shrink-0"
+            className="flex-shrink-0 h-11 w-11"
           >
-            <Paperclip className="h-4 w-4" />
+            <Paperclip className="h-5 w-5" />
           </Button>
 
           {/* Text Input */}
@@ -251,14 +251,14 @@ export default function ChatInput({
             onClick={toggleRecording}
             disabled={disabled}
             className={cn(
-              "flex-shrink-0",
+              "flex-shrink-0 h-11 w-11",
               isRecording && "text-red-500 bg-red-50 dark:bg-red-950"
             )}
           >
             {isRecording ? (
-              <Square className="h-4 w-4" />
+              <Square className="h-5 w-5" />
             ) : (
-              <Mic className="h-4 w-4" />
+              <Mic className="h-5 w-5" />
             )}
           </Button>
 
@@ -268,12 +268,12 @@ export default function ChatInput({
             aria-label="Send message"
             disabled={disabled || (!message.trim() && attachments.length === 0)}
             size="icon"
-            className="flex-shrink-0"
+            className="flex-shrink-0 h-11 w-11"
           >
             {disabled ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
-              <Send className="h-4 w-4" />
+              <Send className="h-5 w-5" />
             )}
           </Button>
         </div>

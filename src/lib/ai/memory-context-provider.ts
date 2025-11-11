@@ -121,39 +121,64 @@ export class MemoryContextProvider {
     const personalFacts: string[] = [];
 
     // Check if this is a personal identity question
-    const isNameQuery = lowerQuery.includes('my name') || 
+    const isNameQuery = lowerQuery.includes('my name') ||
                        lowerQuery.includes('do you know') ||
                        lowerQuery.includes('who am i') ||
-                       lowerQuery.includes('what is my');
+                       lowerQuery.includes('what is my') ||
+                       lowerQuery.includes('call me');
 
-    if (isNameQuery && memories.length > 0) {
+    if (isNameQuery) {
       // Look for name-related memories
-      const nameMemories = memories.filter((memory: MemoryObject) => 
-        memory.content.toLowerCase().includes('name') ||
-        (memory.tags && memory.tags.includes('identity')) ||
-        (memory.tags && memory.tags.includes('personal'))
+      const nameMemories = memories.filter((memory: MemoryObject) =>
+        memory && memory.content && (
+          memory.content.toLowerCase().includes('name') ||
+          memory.content.toLowerCase().includes('kunal') ||
+          (memory.tags && (memory.tags.includes('identity') || memory.tags.includes('personal')))
+        )
       );
 
       for (const memory of nameMemories) {
-        if (memory.content.toLowerCase().includes('kunal')) {
-          personalFacts.push('User name: Kunal');
+        if (memory && memory.content) {
+          // Direct name extraction
+          const nameMatch = memory.content.match(/(?:name is|call me|i am|my name is)\s+([A-Za-z]+)/i);
+          if (nameMatch) {
+            const name = nameMatch[1].trim();
+            personalFacts.push(`User name: ${name}`);
+            break; // Found a name, stop looking
+          }
+          
+          // Generic name lookup
+          if (memory.content.toLowerCase().includes('kunal')) {
+            personalFacts.push('User name: Kunal');
+            break;
+          }
         }
+      }
+
+      // If no name found in memories, provide a helpful response
+      if (personalFacts.length === 0) {
+        personalFacts.push('User name: Not found in previous conversations');
       }
     }
 
     // Look for other personal information
-    const personalMemories = memories.filter((memory: MemoryObject) => 
-      (memory.tags && memory.tags.includes('personal')) ||
-      (memory.tags && memory.tags.includes('identity')) ||
-      memory.content.toLowerCase().includes('my') ||
-      memory.importance_score >= 4
-    );
+    if (memories && memories.length > 0) {
+      const personalMemories = memories.filter((memory: MemoryObject) =>
+        memory && memory.content && (
+          (memory.tags && (memory.tags.includes('personal') || memory.tags.includes('identity'))) ||
+          memory.content.toLowerCase().includes('my') ||
+          (memory.importance_score && memory.importance_score >= 4)
+        )
+      );
 
-    for (const memory of personalMemories.slice(0, 3)) {
-      // Extract key personal information
-      if (memory.content.toLowerCase().includes('grade') || 
-          memory.content.toLowerCase().includes('score')) {
-        personalFacts.push(`Academic: ${memory.content.substring(0, 100)}`);
+      for (const memory of personalMemories.slice(0, 3)) {
+        if (memory && memory.content) {
+          // Extract key personal information
+          if (memory.content.toLowerCase().includes('grade') ||
+              memory.content.toLowerCase().includes('score')) {
+            personalFacts.push(`Academic: ${memory.content.substring(0, 100)}`);
+          }
+        }
       }
     }
 

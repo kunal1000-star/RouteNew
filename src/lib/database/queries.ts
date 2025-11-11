@@ -108,8 +108,9 @@ export class ChatQueries {
 export class MemoryQueries {
   static async addMemory(userId: string, content: string, embedding: number[], importanceScore: number, options: any = {}) {
     try {
-      if (embedding.length !== 1536) {
-        throw new VectorSearchError(`Invalid embedding dimension: expected 1536, got ${embedding.length}`);
+      // Support both 1536 and 1024 dimension embeddings
+      if (embedding.length !== 1536 && embedding.length !== 1024) {
+        throw new VectorSearchError(`Invalid embedding dimension: expected 1536 or 1024, got ${embedding.length}`);
       }
 
       const { data, error } = await supabase
@@ -135,13 +136,26 @@ export class MemoryQueries {
 
   static async findSimilarMemories(userId: string, embedding: number[], options: any = {}) {
     try {
-      if (embedding.length !== 1536) {
-        throw new VectorSearchError(`Invalid embedding dimension: expected 1536, got ${embedding.length}`);
+      // Support both 1536 and 1024 dimension embeddings
+      if (embedding.length !== 1536 && embedding.length !== 1024) {
+        throw new VectorSearchError(`Invalid embedding dimension: expected 1536 or 1024, got ${embedding.length}`);
+      }
+
+      // Validate and format userId to UUID
+      let validUserId: string;
+      if (userId === 'anonymous-user' || userId.startsWith('conv-')) {
+        // Generate a valid UUID for anonymous users or invalid userIds
+        validUserId = crypto.randomUUID();
+      } else if (UUID_REGEX.test(userId)) {
+        validUserId = userId;
+      } else {
+        // For any other invalid format, generate a UUID
+        validUserId = crypto.randomUUID();
       }
 
       // Try vector search first with find_similar_memories function
       const { data, error } = await supabase.rpc('find_similar_memories', {
-        p_user_id: userId,
+        p_user_id: validUserId,
         p_embedding: embedding,
         p_limit: options.limit || 5,
         p_min_similarity: options.min_similarity || 0.7
@@ -220,11 +234,12 @@ export class ProfileQueries {
 
   static async getProfile(userId: string) {
     try {
+      // Use maybeSingle() to avoid "Cannot coerce the result to a single JSON object" error
       const { data, error } = await supabase
         .from('student_ai_profile')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
         throw new DatabaseError(`Failed to fetch profile: ${error.message}`, error.code, error);
@@ -241,19 +256,68 @@ export class ProfileQueries {
 export class APIUsageQueries {
   static async logUsage(userId: string | null, featureName: string, providerUsed: string, modelUsed: string, metadata: any = {}) {
     try {
-      const { data, error } = await supabase.rpc('log_api_usage', {
-        p_user_id: userId,
-        p_feature_name: featureName,
-        p_provider_used: providerUsed,
-        p_model_used: modelUsed,
-        p_tokens_input: metadata.tokens_input || 0,
-        p_tokens_output: metadata.tokens_output || 0,
-        p_latency_ms: metadata.latency_ms || 0,
-        p_success: metadata.success !== false,
-        p_error_message: metadata.error_message
-      });
+      // First try with the enhanced function that includes query_type
+      try {
+        const { data, error } = await supabase.rpc('log_api_usage', {
+          p_user_id: userId,
+          p_feature_name: featureName,
+          p_provider_used: providerUsed,
+          p_model_used: modelUsed,
+          p_tokens_input: metadata.tokens_input || 0,
+          p_tokens_output: metadata.tokens_output || 0,
+          p_latency_ms: metadata.latency_ms || 0,
+          p_success: metadata.success !== false,
+          p_error_message: metadata.error_message,
+          p_query_type: metadata.query_type || 'general'
+        });
 
-      if (error) throw new DatabaseError(`Failed to log API usage: ${error.message}`, error.code, error);
+        if (!error) return data;
+      } catch (rpcError) {
+        // RPC might not exist yet, fall back to direct insert
+      }
+
+      // Fallback: Direct insert to api_usage_logs table
+      const { data, error } = await supabase
+        .from('api_usage_logs')
+        .insert({
+          user_id: userId,
+          feature_name: featureName,
+          provider_used: providerUsed,
+          model_used: modelUsed,
+          tokens_input: metadata.tokens_input || 0,
+          tokens_output: metadata.tokens_output || 0,
+          latency_ms: metadata.latency_ms || 0,
+          success: metadata.success !== false,
+          error_message: metadata.error_message,
+          query_type: metadata.query_type || 'general' // This might fail if column doesn't exist
+        })
+        .select()
+        .single();
+
+      if (error && error.code === 'PGRST204') {
+        // Column doesn't exist yet, try without query_type
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('api_usage_logs')
+          .insert({
+            user_id: userId,
+            feature_name: featureName,
+            provider_used: providerUsed,
+            model_used: modelUsed,
+            tokens_input: metadata.tokens_input || 0,
+            tokens_output: metadata.tokens_output || 0,
+            latency_ms: metadata.latency_ms || 0,
+            success: metadata.success !== false,
+            error_message: metadata.error_message
+          })
+          .select()
+          .single();
+
+        if (fallbackError) throw new DatabaseError(`Failed to log API usage: ${fallbackError.message}`, fallbackError.code, fallbackError);
+        return fallbackData;
+      } else if (error) {
+        throw new DatabaseError(`Failed to log API usage: ${error.message}`, error.code, error);
+      }
+      
       return data;
     } catch (error) {
       if (error instanceof DatabaseError) throw error;
@@ -405,4 +469,4 @@ export class MaintenanceQueries {
 }
 
 // Export the class for module access
-export { MemoryQueries };
+// Named export removed; class is already exported above

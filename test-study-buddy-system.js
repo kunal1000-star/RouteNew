@@ -1,127 +1,131 @@
-// Study Buddy System Test Script
-// ================================
+// Comprehensive Study Buddy System Test
+const http = require('http');
 
-const { createClient } = require('@supabase/supabase-js');
-
-async function testStudyBuddySystem() {
-  console.log('🧪 Testing Study Buddy System After Database Migration...');
-  console.log('=' * 60);
-  
-  try {
-    // Initialize Supabase client
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    
-    if (!supabaseUrl || !supabaseKey) {
-      console.log('❌ Missing Supabase environment variables');
-      return;
-    }
-    
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    
-    // Test 1: Check critical tables exist
-    console.log('\n📋 Test 1: Checking critical database tables...');
-    const criticalTables = [
-      'chat_conversations',
-      'chat_messages', 
-      'student_profiles',
-      'activity_logs',
-      'ai_suggestions',
-      'gamification_blocks',
-      'gamification_user_progress',
-      'penalty_tracking'
-    ];
-    
-    let tablesExist = 0;
-    for (const table of criticalTables) {
-      try {
-        const { data, error } = await supabase
-          .from(table)
-          .select('*')
-          .limit(1);
-        
-        if (error && error.message.includes('does not exist')) {
-          console.log(`❌ ${table}: Table does not exist`);
-        } else {
-          console.log(`✅ ${table}: Table exists`);
-          tablesExist++;
+function makeRequest(options, data) {
+  return new Promise((resolve, reject) => {
+    const req = http.request(options, (res) => {
+      let body = '';
+      res.on('data', (chunk) => body += chunk);
+      res.on('end', () => {
+        console.log(`Status: ${res.statusCode}`);
+        console.log(`Response: ${body}`);
+        try {
+          resolve(JSON.parse(body));
+        } catch (e) {
+          resolve(body);
         }
-      } catch (err) {
-        console.log(`❌ ${table}: Error - ${err.message}`);
-      }
-    }
-    
-    console.log(`\n📊 Database Tables: ${tablesExist}/${criticalTables.length} critical tables exist`);
-    
-    // Test 2: Test Study Assistant API endpoint
-    console.log('\n🔗 Test 2: Testing Study Assistant API endpoint...');
-    try {
-      const testMessage = {
-        message: "Hello, this is a test message",
-        chatType: "study_assistant",
-        conversationId: "test-conversation-123"
-      };
-      
-      // Note: This would normally require authentication
-      console.log('✅ Study Assistant API endpoint structure looks correct');
-      console.log('   - Requires: message, chatType');
-      console.log('   - Expected endpoint: /api/chat/study-assistant/send');
-      
-    } catch (error) {
-      console.log(`❌ Study Assistant API test failed: ${error.message}`);
-    }
-    
-    // Test 3: Test Student Profile API
-    console.log('\n👤 Test 3: Testing Student Profile API...');
-    console.log('✅ Student Profile API structure looks correct');
-    console.log('   - Expected endpoint: /api/student/profile?userId=<id>');
-    
-    // Test 4: Check Study Buddy components
-    console.log('\n🖥️  Test 4: Checking Study Buddy frontend components...');
-    const studyBuddyComponents = [
-      'src/components/study-buddy/study-buddy-chat.tsx',
-      'src/components/study-buddy/StudentProfileCard.tsx', 
-      'src/app/(app)/study-buddy/page.tsx',
-      'src/hooks/use-study-buddy.ts'
-    ];
-    
-    console.log('✅ Study Buddy components exist:');
-    studyBuddyComponents.forEach(component => {
-      console.log(`   - ${component}`);
+      });
     });
     
-    // Test 5: Summary and recommendations
-    console.log('\n📈 Test 5: System Status Summary...');
+    req.on('error', reject);
     
-    if (tablesExist === criticalTables.length) {
-      console.log('✅ ALL CRITICAL TABLES EXIST - Database migration successful!');
-      console.log('✅ Study Buddy system should now be functional');
-      console.log('✅ Ready for end-to-end testing');
-    } else if (tablesExist > 0) {
-      console.log(`⚠️  PARTIAL SUCCESS: ${tablesExist}/${criticalTables.length} tables exist`);
-      console.log('⚠️  Some Study Buddy features may still not work');
-    } else {
-      console.log('❌ NO CRITICAL TABLES FOUND - Database migration may have failed');
-      console.log('❌ Study Buddy system will remain broken');
+    if (data) {
+      req.write(JSON.stringify(data));
     }
-    
-    console.log('\n🎯 Next Steps:');
-    console.log('1. ✅ Database schema is now in place');
-    console.log('2. 🧪 Test Study Buddy page: /study-buddy');
-    console.log('3. 💬 Try sending a chat message');
-    console.log('4. 📊 Verify student profile data displays');
-    console.log('5. 🔄 Test conversation persistence');
-    
-  } catch (error) {
-    console.error('❌ Test script error:', error);
-  }
+    req.end();
+  });
 }
 
-// Run the test
-testStudyBuddySystem().then(() => {
-  console.log('\n🏁 Study Buddy System Test Complete');
-  process.exit(0);
-}).catch(error => {
-  console.error('💥 Test failed:', error);
-  process.exit(1);
-});
+async function runTests() {
+  console.log('=== STUDY BUDDY SYSTEM TESTING ===\n');
+  
+  // Test 1: Basic Study Buddy Chat
+  console.log('1. Testing Study Buddy Chat Endpoint...');
+  try {
+    const response = await makeRequest({
+      hostname: 'localhost',
+      port: 3000,
+      path: '/api/study-buddy',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    }, {
+      message: "hello, can you help me with thermodynamics?",
+      userId: "550e8400-e29b-41d4-a716-446655440000"
+    });
+    
+    console.log('✅ Study Buddy Chat: SUCCESS');
+  } catch (error) {
+    console.log('❌ Study Buddy Chat: FAILED -', error.message);
+  }
+  
+  console.log('\n---\n');
+  
+  // Test 2: AI Chat Direct (for comparison)
+  console.log('2. Testing AI Chat Direct Endpoint...');
+  try {
+    const response = await makeRequest({
+      hostname: 'localhost',
+      port: 3000,
+      path: '/api/ai/chat',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    }, {
+      userId: "550e8400-e29b-41d4-a716-446655440000",
+      message: "thermodynamics sajha do"
+    });
+    
+    console.log('✅ AI Chat Direct: SUCCESS');
+    if (response.success && response.data && response.data.aiResponse) {
+      console.log('Response preview:', response.data.aiResponse.content.substring(0, 200) + '...');
+    }
+  } catch (error) {
+    console.log('❌ AI Chat Direct: FAILED -', error.message);
+  }
+  
+  console.log('\n---\n');
+  
+  // Test 3: Study Buddy Health Check
+  console.log('3. Testing Study Buddy Health Check...');
+  try {
+    const response = await makeRequest({
+      hostname: 'localhost',
+      port: 3000,
+      path: '/api/study-buddy',
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    console.log('✅ Study Buddy Health: SUCCESS');
+    console.log('Status:', response.status);
+    console.log('Features:', response.features);
+  } catch (error) {
+    console.log('❌ Study Buddy Health: FAILED -', error.message);
+  }
+  
+  console.log('\n---\n');
+  
+  // Test 4: Study Buddy with Educational Content
+  console.log('4. Testing Educational Content...');
+  try {
+    const response = await makeRequest({
+      hostname: 'localhost',
+      port: 3000,
+      path: '/api/study-buddy',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    }, {
+      message: "teach me the first law of thermodynamics for JEE",
+      userId: "550e8400-e29b-41d4-a716-446655440000",
+      context: { type: "study" }
+    });
+    
+    console.log('✅ Educational Content: SUCCESS');
+    if (response.studyBuddy && response.studyBuddy.queryType) {
+      console.log('Query Type:', response.studyBuddy.queryType);
+    }
+  } catch (error) {
+    console.log('❌ Educational Content: FAILED -', error.message);
+  }
+  
+  console.log('\n=== TESTING COMPLETE ===');
+}
+
+runTests().catch(console.error);

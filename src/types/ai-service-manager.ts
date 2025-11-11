@@ -19,6 +19,8 @@ export interface AIServiceManagerRequest {
   conversationId: string;
   chatType: ChatType;
   includeAppData: boolean;
+  provider?: string;
+  model?: string;
 }
 
 // AI Service Manager Response
@@ -150,8 +152,11 @@ export interface ApiUsageLog {
   error_message?: string;
   timestamp?: Date;
   query_type?: string;
-  tier_used?: number;
+  tier_used?: string;
   fallback_used?: boolean;
+  endpoint?: string;
+  cost_estimate?: number;
+  created_at?: Date;
 }
 
 // Fallback Chain

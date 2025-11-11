@@ -1,0 +1,144 @@
+{
+  "timestamp": "2025-11-10T13:03:12.514Z",
+  "totalDuration": 7819,
+  "totalTests": 15,
+  "passedTests": 12,
+  "failedTests": 3,
+  "successRate": "80.0%",
+  "userId": "322531b3-173d-42a9-be4c-770ad92ac8b8",
+  "testResults": [
+    {
+      "testName": "Health Check Endpoint",
+      "status": "FAIL",
+      "duration": 240,
+      "success": false,
+      "details": {},
+      "error": null
+    },
+    {
+      "testName": "Study Assistant Send",
+      "status": "FAIL",
+      "duration": 1027,
+      "success": false,
+      "details": {},
+      "error": null
+    },
+    {
+      "testName": "Memory Storage",
+      "status": "FAIL",
+      "duration": 399,
+      "success": false,
+      "details": {},
+      "error": null
+    },
+    {
+      "testName": "Semantic Search",
+      "status": "PASS",
+      "duration": 6109,
+      "success": true,
+      "details": {},
+      "error": null
+    },
+    {
+      "testName": "Table: conversations",
+      "status": "PASS",
+      "duration": 100,
+      "success": true,
+      "details": {},
+      "error": null
+    },
+    {
+      "testName": "Table: messages",
+      "status": "PASS",
+      "duration": 100,
+      "success": true,
+      "details": {},
+      "error": null
+    },
+    {
+      "testName": "Table: study_memories",
+      "status": "PASS",
+      "duration": 100,
+      "success": true,
+      "details": {},
+      "error": null
+    },
+    {
+      "testName": "Table: user_profiles",
+      "status": "PASS",
+      "duration": 100,
+      "success": true,
+      "details": {},
+      "error": null
+    },
+    {
+      "testName": "Table: ai_suggestions",
+      "status": "PASS",
+      "duration": 100,
+      "success": true,
+      "details": {},
+      "error": null
+    },
+    {
+      "testName": "Table: hallucination_prevention_logs",
+      "status": "PASS",
+      "duration": 100,
+      "success": true,
+      "details": {},
+      "error": null
+    },
+    {
+      "testName": "Component: UniversalChat",
+      "status": "PASS",
+      "duration": 50,
+      "success": true,
+      "details": {},
+      "error": null
+    },
+    {
+      "testName": "Component: UniversalChatEnhanced",
+      "status": "PASS",
+      "duration": 50,
+      "success": true,
+      "details": {},
+      "error": null
+    },
+    {
+      "testName": "Component: UniversalChatWithFeatureFlags",
+      "status": "PASS",
+      "duration": 50,
+      "success": true,
+      "details": {},
+      "error": null
+    },
+    {
+      "testName": "Component: StudyBuddy",
+      "status": "PASS",
+      "duration": 50,
+      "success": true,
+      "details": {},
+      "error": null
+    },
+    {
+      "testName": "Component: AIFeaturesDashboard",
+      "status": "PASS",
+      "duration": 50,
+      "success": true,
+      "details": {},
+      "error": null
+    }
+  ],
+  "errors": [
+    {
+      "error": {
+        "code": "MODULE_NOT_FOUND",
+        "requireStack": [
+          "c:\\Users\\kunal\\Ruther\\ROUTE\\run-debug-ai-tests.js"
+        ]
+      },
+      "context": "TypeScript Tests",
+      "timestamp": "2025-11-10T13:03:04.707Z"
+    }
+  ],
+  "warnings": []
+}

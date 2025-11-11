@@ -1,13 +1,14 @@
 // Settings Service - Phase 3 Implementation
 // Centralized settings management for all 5 tabs
 
-import type { 
-  UserSettings, 
-  AIModelSettings, 
-  FeaturePreferences, 
-  NotificationSettings, 
-  PrivacyControls, 
+import type {
+  UserSettings,
+  AIModelSettings,
+  FeaturePreferences,
+  NotificationSettings,
+  PrivacyControls,
   UsageMonitoring,
+  StudyBuddySettings,
   SettingsResponse,
   SettingsUpdateRequest,
   UsageStatistics
@@ -145,6 +146,79 @@ export const getDefaultUserSettings = (userId: string): UserSettings => ({
       showTrends: true,
       showPredictions: true
     }
+  },
+  studyBuddy: {
+    endpoints: {
+      chat: {
+        enabled: true,
+        provider: 'gemini',
+        model: 'gemini-2.0-flash',
+        timeout: 30,
+        retryAttempts: 3,
+        fallbackProvider: 'mistral',
+        fallbackModel: 'mistral-medium-latest'
+      },
+      embeddings: {
+        enabled: true,
+        provider: 'cohere',
+        model: 'embed-english-v3.0',
+        timeout: 30,
+        retryAttempts: 3,
+        fallbackProvider: 'openrouter',
+        fallbackModel: 'nomic-embed-text-v1.5'
+      },
+      memoryStorage: {
+        enabled: true,
+        provider: 'groq',
+        model: 'llama3-8b-8192',
+        timeout: 30,
+        retryAttempts: 3,
+        fallbackProvider: 'mistral',
+        fallbackModel: 'mistral-small-latest'
+      },
+      orchestrator: {
+        enabled: true,
+        provider: 'mistral',
+        model: 'mistral-large-latest',
+        timeout: 30,
+        retryAttempts: 3,
+        fallbackProvider: 'gemini',
+        fallbackModel: 'gemini-1.5-flash'
+      },
+      personalized: {
+        enabled: true,
+        provider: 'gemini',
+        model: 'gemini-1.5-flash',
+        timeout: 30,
+        retryAttempts: 3,
+        fallbackProvider: 'mistral',
+        fallbackModel: 'mistral-large-latest'
+      },
+      semanticSearch: {
+        enabled: true,
+        provider: 'cohere',
+        model: 'embed-english-v3.0',
+        timeout: 30,
+        retryAttempts: 3,
+        fallbackProvider: 'openrouter',
+        fallbackModel: 'nomic-embed-text-v1.5'
+      },
+      webSearch: {
+        enabled: true,
+        provider: 'gemini',
+        model: 'gemini-2.0-flash',
+        timeout: 30,
+        retryAttempts: 3,
+        fallbackProvider: 'mistral',
+        fallbackModel: 'mistral-medium-latest'
+      }
+    },
+    globalDefaults: {
+      provider: 'gemini',
+      model: 'gemini-2.0-flash'
+    },
+    testAllEndoints: true,
+    enableHealthMonitoring: true
   },
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString()
@@ -347,6 +421,28 @@ export class SettingsService {
     });
   }
 
+  // Get Study Buddy settings (Tab 6)
+  async getStudyBuddySettings(userId: string): Promise<StudyBuddySettings | null> {
+    const settings = await this.getUserSettings(userId);
+    return settings?.studyBuddy || null;
+  }
+
+  async updateStudyBuddySettings(userId: string, studyBuddySettings: Partial<StudyBuddySettings>): Promise<SettingsResponse> {
+    const settings = await this.getUserSettings(userId);
+    if (!settings) return { success: false, error: 'Settings not found' };
+    
+    const updatedSettings = {
+      ...settings,
+      studyBuddy: { ...settings.studyBuddy, ...studyBuddySettings },
+      updatedAt: new Date().toISOString()
+    };
+
+    return this.updateSettings(userId, {
+      tab: 'studyBuddy',
+      settings: updatedSettings
+    });
+  }
+
   // Get usage statistics for Tab 5
   async getUsageStatistics(userId: string): Promise<UsageStatistics> {
     try {
@@ -462,6 +558,9 @@ export class SettingsService {
         break;
       case 'usage':
         merged.usage = { ...current.usage, ...updates.usage };
+        break;
+      case 'studyBuddy':
+        merged.studyBuddy = { ...current.studyBuddy, ...updates.studyBuddy };
         break;
     }
 

@@ -38,7 +38,6 @@ import type { User } from '@supabase/supabase-js';
 
 const navItems = [
   { href: '/dashboard', label: 'Home', icon: LayoutDashboard, tooltip: 'Dashboard' },
-  
   { href: '/study-buddy', label: 'Study Buddy', icon: BookOpen, tooltip: 'Study Buddy' },
   { href: '/schedule', label: 'Schedule', icon: Calendar, tooltip: 'Schedule' },
   { href: '/topics', label: 'Syllabus', icon: Book, tooltip: 'Syllabus' },

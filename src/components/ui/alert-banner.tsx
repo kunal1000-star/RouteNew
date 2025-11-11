@@ -20,10 +20,10 @@ export default function AlertBanner({ message, onRetry, onDismiss, className }: 
       </div>
       <div className="flex items-center gap-2">
         {onRetry && (
-          <Button size="sm" variant="outline" onClick={onRetry} className="h-7 px-2">Retry</Button>
+          <Button size="sm" variant="outline" onClick={onRetry} className="h-11 px-2">Retry</Button>
         )}
         {onDismiss && (
-          <Button size="sm" variant="ghost" onClick={onDismiss} className="h-7 px-2">Dismiss</Button>
+          <Button size="sm" variant="ghost" onClick={onDismiss} className="h-11 px-2">Dismiss</Button>
         )}
       </div>
     </div>

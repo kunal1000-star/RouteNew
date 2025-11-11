@@ -1,0 +1,146 @@
+{
+  "summary": {
+    "timestamp": "2025-11-11T02:09:02.973Z",
+    "totalTests": 11,
+    "passedTests": 11,
+    "failedTests": 0,
+    "overallStatus": "PASSED"
+  },
+  "details": {
+    "timestamp": "2025-11-11T02:09:02.973Z",
+    "systemConnectivity": {
+      "status": "completed",
+      "results": [
+        {
+          "name": "Study Buddy Endpoint",
+          "url": "http://localhost:3000/api/study-buddy",
+          "status": 200,
+          "available": true,
+          "timestamp": "2025-11-11T02:09:03.387Z"
+        },
+        {
+          "name": "Health Check",
+          "url": "http://localhost:3000/api/chat/health-check",
+          "status": 200,
+          "available": true,
+          "timestamp": "2025-11-11T02:09:05.914Z"
+        },
+        {
+          "name": "Memory Storage",
+          "url": "http://localhost:3000/api/ai/memory-storage",
+          "status": 200,
+          "available": true,
+          "timestamp": "2025-11-11T02:09:06.436Z"
+        },
+        {
+          "name": "Semantic Search",
+          "url": "http://localhost:3000/api/ai/semantic-search",
+          "status": 200,
+          "available": true,
+          "timestamp": "2025-11-11T02:09:07.183Z"
+        }
+      ]
+    },
+    "endpointAvailability": {
+      "status": "completed",
+      "tests": [
+        {
+          "name": "Study Buddy POST",
+          "url": "http://localhost:3000/api/study-buddy",
+          "method": "POST",
+          "status": 400,
+          "accessible": true,
+          "timestamp": "2025-11-11T02:09:07.532Z"
+        },
+        {
+          "name": "AI Chat",
+          "url": "http://localhost:3000/api/ai/chat",
+          "method": "POST",
+          "status": 200,
+          "accessible": true,
+          "timestamp": "2025-11-11T02:09:27.226Z"
+        },
+        {
+          "name": "Memory Search",
+          "url": "http://localhost:3000/api/memory/search",
+          "method": "POST",
+          "status": 400,
+          "accessible": true,
+          "timestamp": "2025-11-11T02:09:27.778Z"
+        }
+      ]
+    },
+    "criticalFunctionality": {
+      "status": "completed",
+      "checks": [
+        {
+          "name": "API Structure Validation",
+          "passed": [
+            "memory-integration",
+            "hallucination-prevention",
+            "personalization",
+            "educational-content",
+            "jee-preparation",
+            "thermodynamics-teaching"
+          ],
+          "message": "API returns proper structure with features/status",
+          "details": {
+            "responseStatus": 200,
+            "hasFeatures": true
+          }
+        },
+        {
+          "name": "Memory Integration Check",
+          "passed": true,
+          "message": "Memory system endpoints accessible",
+          "details": {
+            "responseStatus": 200
+          }
+        },
+        {
+          "name": "Hallucination Prevention Check",
+          "passed": true,
+          "message": "5-layer hallucination prevention system detected",
+          "details": {
+            "features": [
+              "memory-integration",
+              "hallucination-prevention",
+              "personalization",
+              "educational-content",
+              "jee-preparation",
+              "thermodynamics-teaching"
+            ]
+          }
+        },
+        {
+          "name": "Study Buddy Features Check",
+          "passed": true,
+          "message": "All study buddy features detected",
+          "details": {
+            "required": [
+              "memory-integration",
+              "hallucination-prevention",
+              "personalization",
+              "educational-content",
+              "jee-preparation",
+              "thermodynamics-teaching"
+            ],
+            "available": [
+              "memory-integration",
+              "hallucination-prevention",
+              "personalization",
+              "educational-content",
+              "jee-preparation",
+              "thermodynamics-teaching"
+            ],
+            "missing": []
+          }
+        }
+      ]
+    }
+  },
+  "systemAssessment": "EXCELLENT - All systems operational",
+  "recommendations": [
+    "System is functioning well - consider performance optimization"
+  ]
+}

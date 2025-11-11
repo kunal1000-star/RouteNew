@@ -1,0 +1,144 @@
+{
+  "passed": 21,
+  "failed": 2,
+  "tests": [
+    {
+      "test": "Service Integration Layer",
+      "status": "PASS",
+      "message": "Service integration layer file exists",
+      "timestamp": "2025-11-10T11:35:21.194Z"
+    },
+    {
+      "test": "AI Service Manager",
+      "status": "PASS",
+      "message": "AI service manager unified file exists",
+      "timestamp": "2025-11-10T11:35:21.195Z"
+    },
+    {
+      "test": "Web Search Endpoint",
+      "status": "PASS",
+      "message": "Web search API endpoint exists",
+      "timestamp": "2025-11-10T11:35:21.195Z"
+    },
+    {
+      "test": "UniversalChat Base",
+      "status": "PASS",
+      "message": "UniversalChat base component exists",
+      "timestamp": "2025-11-10T11:35:21.195Z"
+    },
+    {
+      "test": "UniversalChat Enhanced",
+      "status": "PASS",
+      "message": "UniversalChat enhanced component exists",
+      "timestamp": "2025-11-10T11:35:21.195Z"
+    },
+    {
+      "test": "Service Layer AI Manager Import",
+      "status": "FAIL",
+      "message": "Missing aiServiceManager import",
+      "timestamp": "2025-11-10T11:35:21.196Z"
+    },
+    {
+      "test": "Service Layer Enhanced Request",
+      "status": "PASS",
+      "message": "Contains processEnhancedRequest method",
+      "timestamp": "2025-11-10T11:35:21.196Z"
+    },
+    {
+      "test": "Enhanced Component Service Layer Import",
+      "status": "FAIL",
+      "message": "Missing service integration layer import",
+      "timestamp": "2025-11-10T11:35:21.196Z"
+    },
+    {
+      "test": "Enhanced Component WebSearch Result",
+      "status": "PASS",
+      "message": "Contains WebSearchResult type",
+      "timestamp": "2025-11-10T11:35:21.197Z"
+    },
+    {
+      "test": "Web Search POST Endpoint",
+      "status": "PASS",
+      "message": "POST endpoint exists",
+      "timestamp": "2025-11-10T11:35:21.197Z"
+    },
+    {
+      "test": "Web Search GET Health Check",
+      "status": "PASS",
+      "message": "GET health check endpoint exists",
+      "timestamp": "2025-11-10T11:35:21.197Z"
+    },
+    {
+      "test": "Search Providers Configuration",
+      "status": "PASS",
+      "message": "All search providers configured",
+      "timestamp": "2025-11-10T11:35:21.197Z"
+    },
+    {
+      "test": "Service Manager Process Query",
+      "status": "PASS",
+      "message": "processQuery method exists",
+      "timestamp": "2025-11-10T11:35:21.197Z"
+    },
+    {
+      "test": "Service Manager Fallback Chains",
+      "status": "PASS",
+      "message": "Fallback chain configuration exists",
+      "timestamp": "2025-11-10T11:35:21.197Z"
+    },
+    {
+      "test": "Service Manager Health Check",
+      "status": "PASS",
+      "message": "Health check method exists",
+      "timestamp": "2025-11-10T11:35:21.198Z"
+    },
+    {
+      "test": "Service Manager Singleton",
+      "status": "PASS",
+      "message": "Singleton instance exported",
+      "timestamp": "2025-11-10T11:35:21.198Z"
+    },
+    {
+      "test": "Enhanced Component Service Integration",
+      "status": "PASS",
+      "message": "Uses service integration layer",
+      "timestamp": "2025-11-10T11:35:21.198Z"
+    },
+    {
+      "test": "Enhanced Component Web Search Display",
+      "status": "PASS",
+      "message": "Displays web search results",
+      "timestamp": "2025-11-10T11:35:21.198Z"
+    },
+    {
+      "test": "Enhanced Component Hallucination Prevention",
+      "status": "PASS",
+      "message": "Contains hallucination prevention layers",
+      "timestamp": "2025-11-10T11:35:21.198Z"
+    },
+    {
+      "test": "Enhanced Component Health Monitoring",
+      "status": "PASS",
+      "message": "Contains service health monitoring",
+      "timestamp": "2025-11-10T11:35:21.198Z"
+    },
+    {
+      "test": "AI Service Manager Request Type",
+      "status": "PASS",
+      "message": "AIServiceManagerRequest interface exists",
+      "timestamp": "2025-11-10T11:35:21.198Z"
+    },
+    {
+      "test": "AI Service Manager Response Type",
+      "status": "PASS",
+      "message": "AIServiceManagerResponse interface exists",
+      "timestamp": "2025-11-10T11:35:21.198Z"
+    },
+    {
+      "test": "App Data Context Type",
+      "status": "PASS",
+      "message": "AppDataContext interface exists",
+      "timestamp": "2025-11-10T11:35:21.198Z"
+    }
+  ]
+}

@@ -1,0 +1,198 @@
+{
+  "testResults": {
+    "timestamp": "2025-11-11T03:22:05.716Z",
+    "database": {
+      "connection": {
+        "status": "success",
+        "timestamp": "2025-11-11T03:22:06.156Z",
+        "message": "Database connection established"
+      },
+      "schema": {
+        "status": "completed",
+        "timestamp": "2025-11-11T03:22:06.954Z",
+        "tables": [
+          {
+            "table": "profiles",
+            "exists": true
+          },
+          {
+            "table": "student_ai_profile",
+            "exists": true
+          },
+          {
+            "table": "api_usage_logs",
+            "exists": true
+          },
+          {
+            "table": "memory_storage",
+            "exists": false,
+            "error": "Could not find the table 'public.memory_storage' in the schema cache"
+          },
+          {
+            "table": "conversations",
+            "exists": false,
+            "error": "Could not find the table 'public.conversations' in the schema cache"
+          },
+          {
+            "table": "student_ai_messages",
+            "exists": false,
+            "error": "Could not find the table 'public.student_ai_messages' in the schema cache"
+          },
+          {
+            "table": "user_penalties",
+            "exists": true
+          },
+          {
+            "table": "search_cache",
+            "exists": false,
+            "error": "Could not find the table 'public.search_cache' in the schema cache"
+          }
+        ],
+        "allTablesExist": false
+      }
+    },
+    "api": {
+      "usageLogs": {
+        "status": "completed",
+        "timestamp": "2025-11-11T03:22:07.378Z",
+        "userTests": [
+          {
+            "user": "Test User",
+            "success": false,
+            "error": "Could not find the 'endpoint' column of 'api_usage_logs' in the schema cache"
+          },
+          {
+            "user": "Anonymous User",
+            "success": false,
+            "error": "Could not find the 'endpoint' column of 'api_usage_logs' in the schema cache"
+          },
+          {
+            "user": "Kunal User",
+            "success": false,
+            "error": "Could not find the 'endpoint' column of 'api_usage_logs' in the schema cache"
+          }
+        ],
+        "allSuccessful": false
+      },
+      "endpoints": {
+        "status": "completed",
+        "timestamp": "2025-11-11T03:22:08.430Z",
+        "tests": [
+          {
+            "endpoint": "/api/chat/health-check",
+            "method": "GET",
+            "status": 0,
+            "success": false,
+            "responseTime": "N/A"
+          },
+          {
+            "endpoint": "/api/chat/conversations",
+            "method": "GET",
+            "status": 0,
+            "success": false,
+            "responseTime": "N/A"
+          },
+          {
+            "endpoint": "/api/ai/memory-storage",
+            "method": "POST",
+            "status": 0,
+            "success": false,
+            "responseTime": "N/A"
+          },
+          {
+            "endpoint": "/api/study-buddy",
+            "method": "GET",
+            "status": 0,
+            "success": false,
+            "responseTime": "N/A"
+          }
+        ],
+        "allWorking": false
+      }
+    },
+    "memory": {
+      "storage": {
+        "status": "completed",
+        "timestamp": "2025-11-11T03:22:07.925Z",
+        "userTests": [
+          {
+            "user": "Test User",
+            "storage": false,
+            "retrieval": false,
+            "error": "Could not find the table 'public.memory_storage' in the schema cache"
+          },
+          {
+            "user": "Anonymous User",
+            "storage": false,
+            "retrieval": false,
+            "error": "Could not find the table 'public.memory_storage' in the schema cache"
+          },
+          {
+            "user": "Kunal User",
+            "storage": false,
+            "retrieval": false,
+            "error": "Could not find the table 'public.memory_storage' in the schema cache"
+          }
+        ],
+        "allSuccessful": false
+      }
+    },
+    "studyBuddy": {
+      "auth": {
+        "status": "completed",
+        "timestamp": "2025-11-11T03:22:08.429Z",
+        "userTests": [
+          {
+            "user": "Test User",
+            "rls": true,
+            "accessGranted": false
+          },
+          {
+            "user": "Anonymous User",
+            "rls": true,
+            "accessGranted": false
+          },
+          {
+            "user": "Kunal User",
+            "rls": true,
+            "accessGranted": false
+          }
+        ],
+        "allRlsPassed": true
+      }
+    },
+    "auth": {},
+    "errors": [],
+    "summary": {
+      "total": 6,
+      "passed": 1,
+      "failed": 3,
+      "warnings": 3
+    },
+    "dependencies": {
+      "status": "completed",
+      "timestamp": "2025-11-11T03:22:08.431Z",
+      "prismjs": {
+        "installed": "^1.29.0",
+        "version": "^1.29.0"
+      }
+    }
+  },
+  "summary": {
+    "overallStatus": "FAIL",
+    "totalTests": 6,
+    "passed": 1,
+    "failed": 3,
+    "warnings": 3,
+    "successRate": 17
+  },
+  "recommendations": [
+    "Critical issues detected - immediate intervention required"
+  ],
+  "criticalIssues": [
+    "Missing database tables - core functionality impaired",
+    "API usage logging failures - monitoring compromised",
+    "Memory system failures - core AI features impaired",
+    "API endpoint failures - application routes compromised"
+  ]
+}

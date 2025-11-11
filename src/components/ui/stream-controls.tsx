@@ -42,12 +42,12 @@ export default function StreamControls({ streaming, onStop, onStopKeep, onStopCl
             {tokensApprox ? `${tokensApprox} tok` : `${wordsApprox} w`}
           </span>
         )}
-        <Button variant="ghost" size="sm" className="h-6 px-2" onClick={handleKeep} aria-label="Stop streaming">
-          <Square className="h-3 w-3" /> Stop
+        <Button variant="ghost" size="sm" className="h-11 px-2" onClick={handleKeep} aria-label="Stop streaming">
+          <Square className="h-4 w-4" /> Stop
         </Button>
         {handleClear && (
-          <Button variant="ghost" size="sm" className="h-6 px-2" onClick={handleClear} aria-label="Stop and clear">
-            <Slash className="h-3 w-3" /> Stop & Clear
+          <Button variant="ghost" size="sm" className="h-11 px-2" onClick={handleClear} aria-label="Stop and clear">
+            <Slash className="h-4 w-4" /> Stop & Clear
           </Button>
         )}
       </div>
@@ -60,12 +60,12 @@ export default function StreamControls({ streaming, onStop, onStopKeep, onStopCl
           {tokensApprox ? `${tokensApprox} tokens` : `${wordsApprox} words`}
         </span>
       )}
-      <Button variant="ghost" size="sm" className="h-6 px-2" onClick={handleKeep} aria-label="Stop streaming">
-        <Square className="h-3 w-3" /> Stop
+      <Button variant="ghost" size="sm" className="h-11 px-2" onClick={handleKeep} aria-label="Stop streaming">
+        <Square className="h-4 w-4" /> Stop
       </Button>
       {handleClear && (
-        <Button variant="ghost" size="sm" className="h-6 px-2" onClick={handleClear} aria-label="Stop and clear">
-          <Slash className="h-3 w-3" /> Stop & Clear
+        <Button variant="ghost" size="sm" className="h-11 px-2" onClick={handleClear} aria-label="Stop and clear">
+          <Slash className="h-4 w-4" /> Stop & Clear
         </Button>
       )}
     </div>

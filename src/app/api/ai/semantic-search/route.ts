@@ -264,7 +264,7 @@ export async function POST(request: NextRequest) {
     // Set default options
     const searchOptions = {
       limit: Math.min(body.limit || 5, 20), // Cap at 20
-      min_similarity: Math.max(0.1, Math.min(body.minSimilarity || 0.7, 1.0)),
+      min_similarity: Math.max(0.1, Math.min(body.minSimilarity || 0.5, 1.0)), // Lower threshold for faster results
       tags: body.tags || [],
       importance_score: body.importanceScore
     };

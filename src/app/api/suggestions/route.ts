@@ -2,12 +2,12 @@
 // Handle generation, retrieval, and management of AI study suggestions
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { 
-  generateAllSuggestions, 
-  getCachedSuggestions, 
+import {
+  generateAllSuggestions,
+  getCachedSuggestions,
   cacheSuggestions,
   type StudentProfile,
-  type Suggestion 
+  type Suggestion
 } from '../../../lib/ai/ai-suggestions';
 
 const supabase = createClient(
@@ -27,6 +27,30 @@ function getDbForToken(token: string) {
       }
     }
   );
+}
+
+/**
+ * Convert string priority to integer for database storage
+ * Maps: "low" -> 1, "medium" -> 2, "high" -> 3
+ */
+function convertPriorityToInt(priority: string | number): { priority: number, priority_text: string } {
+  // If already a number, return it with default text
+  if (typeof priority === 'number') {
+    return {
+      priority,
+      priority_text: priority >= 3 ? 'high' : priority === 2 ? 'medium' : 'low'
+    };
+  }
+  
+  // Convert string to integer
+  const priorityMap: Record<string, number> = {
+    'low': 1,
+    'medium': 2,
+    'high': 3
+  };
+  
+  const intValue = priorityMap[priority.toLowerCase()] || 2; // Default to medium
+  return { priority: intValue, priority_text: priority.toLowerCase() };
 }
 
 async function authenticateUser(request: NextRequest) {
@@ -182,16 +206,25 @@ export async function GET(request: NextRequest) {
       // Determine title/description
       const title = hasLegacy ? s.title : (hasModern ? s.suggestion_title : 'Suggestion');
       const description = hasLegacy ? s.description : (hasModern ? s.suggestion_content : '');
-      // Determine priority
+      
+      // Determine priority - handle new priority_text field and legacy formats
       let priority: 'low' | 'medium' | 'high' = 'medium';
-      if (hasLegacy && typeof s.priority === 'string') {
-        priority = (s.priority as any) as 'low' | 'medium' | 'high';
+      
+      // Priority handling hierarchy:
+      // 1. Use priority_text if available (new format)
+      // 2. Use priority as string if available (legacy format)
+      // 3. Use priority as number and map to string (legacy numeric format)
+      if (s.priority_text) {
+        priority = s.priority_text.toLowerCase() as 'low' | 'medium' | 'high';
+      } else if (typeof s.priority === 'string') {
+        priority = s.priority.toLowerCase() as 'low' | 'medium' | 'high';
       } else if (typeof s.priority === 'number') {
-        // Map 1..5 to low/medium/high
-        if (s.priority >= 4) priority = 'high';
-        else if (s.priority === 3) priority = 'medium';
+        // Map 1..3 to low/medium/high (supports both old and new numeric formats)
+        if (s.priority >= 3) priority = 'high';
+        else if (s.priority === 2) priority = 'medium';
         else priority = 'low';
       }
+      
       // Determine estimatedImpact
       const estimatedImpact = typeof s.estimated_impact === 'number' ? s.estimated_impact : (typeof s.priority === 'number' ? s.priority : 5);
 
@@ -324,20 +357,24 @@ export async function POST(request: NextRequest) {
     // Store suggestions in database
     if (suggestions.length > 0) {
       // Insert using legacy schema columns; DB has triggers/views for analytics
-      const suggestionsToInsert = suggestions.map((suggestion: Suggestion) => ({
-        user_id: userId,
-        suggestion_type: suggestion.type,
-        title: suggestion.title,
-        description: suggestion.description,
-        priority: typeof suggestion.priority === 'string' ? suggestion.priority : (suggestion.priority >= 4 ? 'high' : suggestion.priority === 3 ? 'medium' : 'low'),
-        estimated_impact: suggestion.estimatedImpact,
-        reasoning: suggestion.reasoning,
-        actionable_steps: suggestion.actionableSteps,
-        related_topics: suggestion.relatedTopics || [],
-        confidence_score: suggestion.confidenceScore,
-        metadata: suggestion.metadata || {},
-        expires_at: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString() // 6 hours
-      }));
+      const suggestionsToInsert = suggestions.map((suggestion: Suggestion) => {
+        const priorityData = convertPriorityToInt(suggestion.priority);
+        return {
+          user_id: userId,
+          suggestion_type: suggestion.type,
+          title: suggestion.title,
+          description: suggestion.description,
+          priority: priorityData.priority, // Integer value for database
+          priority_text: priorityData.priority_text, // String value for readability
+          estimated_impact: suggestion.estimatedImpact,
+          reasoning: suggestion.reasoning,
+          actionable_steps: suggestion.actionableSteps,
+          related_topics: suggestion.relatedTopics || [],
+          confidence_score: suggestion.confidenceScore,
+          metadata: suggestion.metadata || {},
+          expires_at: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString() // 6 hours
+        };
+      });
 
       const { error: insertError } = await db
         .from('ai_suggestions')

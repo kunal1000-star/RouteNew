@@ -1,0 +1,128 @@
+{
+  "summary": {
+    "timestamp": "2025-11-11T02:07:44.149Z",
+    "totalTests": 11,
+    "passedTests": 0,
+    "failedTests": 11,
+    "overallStatus": "FAILED"
+  },
+  "details": {
+    "timestamp": "2025-11-11T02:07:44.149Z",
+    "multiStepConversation": {
+      "status": "completed",
+      "results": [
+        {
+          "step": 1,
+          "message": "I'm studying for my JEE exam next month",
+          "error": "HTTP 401: Unauthorized",
+          "passed": false
+        },
+        {
+          "step": 2,
+          "message": "What topics should I focus on?",
+          "error": "HTTP 401: Unauthorized",
+          "passed": false
+        },
+        {
+          "step": 3,
+          "message": "Can you help me understand thermodynamic cycles?",
+          "error": "HTTP 401: Unauthorized",
+          "passed": false
+        },
+        {
+          "step": 4,
+          "message": "What's the latest research on renewable energy?",
+          "error": "HTTP 401: Unauthorized",
+          "passed": false
+        },
+        {
+          "step": 5,
+          "message": "Remember what I asked about thermodynamics earlier",
+          "error": "HTTP 401: Unauthorized",
+          "passed": false
+        }
+      ]
+    },
+    "performance": {
+      "status": "completed",
+      "metrics": {
+        "responseTimes": [
+          352,
+          392,
+          345,
+          339,
+          322
+        ],
+        "averageResponseTime": 350,
+        "maxResponseTime": 392,
+        "minResponseTime": 322,
+        "errorRate": 100,
+        "totalRequests": 5,
+        "successfulRequests": 0
+      }
+    },
+    "responseQuality": {
+      "status": "completed",
+      "assessments": [
+        {
+          "prompt": "Explain quantum mechanics in simple terms",
+          "error": "HTTP 401: Unauthorized",
+          "quality": {
+            "score": 0,
+            "issues": [
+              "Request failed"
+            ]
+          }
+        },
+        {
+          "prompt": "What are the benefits of renewable energy?",
+          "error": "HTTP 401: Unauthorized",
+          "quality": {
+            "score": 0,
+            "issues": [
+              "Request failed"
+            ]
+          }
+        },
+        {
+          "prompt": "Help me understand photosynthesis step by step",
+          "error": "HTTP 401: Unauthorized",
+          "quality": {
+            "score": 0,
+            "issues": [
+              "Request failed"
+            ]
+          }
+        }
+      ]
+    },
+    "criticalScenarios": {
+      "status": "completed",
+      "scenarios": [
+        {
+          "name": "Thermodynamics Educational Content",
+          "query": "thermodynamics sajha do",
+          "error": "HTTP 401: Unauthorized",
+          "passed": false
+        },
+        {
+          "name": "Personalized JEE Preparation",
+          "query": "I'm preparing for JEE, help with physics",
+          "error": "HTTP 401: Unauthorized",
+          "passed": false
+        },
+        {
+          "name": "Contextual Memory Recall",
+          "query": "What did I ask about earlier?",
+          "error": "HTTP 401: Unauthorized",
+          "passed": false
+        }
+      ]
+    }
+  },
+  "recommendations": [
+    "Fix conversation flow and context maintenance",
+    "Improve response quality and educational content",
+    "Address critical user scenario failures"
+  ]
+}

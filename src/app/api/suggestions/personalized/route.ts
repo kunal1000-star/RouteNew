@@ -85,29 +85,57 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Generated', suggestions.length, 'personalized suggestions');
 
+    /**
+     * Convert string priority to integer for database storage
+     * Maps: "low" -> 1, "medium" -> 2, "high" -> 3
+     */
+    function convertPriorityToInt(priority: string | number): { priority: number, priority_text: string } {
+      // If already a number, return it with default text
+      if (typeof priority === 'number') {
+        return {
+          priority,
+          priority_text: priority >= 3 ? 'high' : priority === 2 ? 'medium' : 'low'
+        };
+      }
+      
+      // Convert string to integer
+      const priorityMap: Record<string, number> = {
+        'low': 1,
+        'medium': 2,
+        'high': 3
+      };
+      
+      const intValue = priorityMap[priority.toLowerCase()] || 2; // Default to medium
+      return { priority: intValue, priority_text: priority.toLowerCase() };
+    }
+
     // Convert to database format and store
     if (suggestions.length > 0) {
-      const suggestionsToInsert = suggestions.map((suggestion: StudySuggestion) => ({
-        user_id: userId,
-        suggestion_type: suggestion.type,
-        title: suggestion.title,
-        description: suggestion.description,
-        priority: suggestion.priority,
-        estimated_impact: suggestion.difficulty === 'hard' ? 9 : 
-                        suggestion.difficulty === 'medium' ? 6 : 3,
-        reasoning: suggestion.reasoning,
-        actionable_steps: [suggestion.description], // Use description as primary step
-        related_topics: suggestion.subjects,
-        confidence_score: suggestion.confidence,
-        metadata: {
-          ...suggestion.metadata,
-          difficulty: suggestion.difficulty,
-          estimatedDuration: suggestion.estimatedDuration,
-          tags: suggestion.tags,
-          actions: suggestion.actions || []
-        },
-        expires_at: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString() // 4 hours
-      }));
+      const suggestionsToInsert = suggestions.map((suggestion: StudySuggestion) => {
+        const priorityData = convertPriorityToInt(suggestion.priority);
+        return {
+          user_id: userId,
+          suggestion_type: suggestion.type,
+          title: suggestion.title,
+          description: suggestion.description,
+          priority: priorityData.priority, // Integer value for database
+          priority_text: priorityData.priority_text, // String value for readability
+          estimated_impact: suggestion.difficulty === 'hard' ? 9 :
+                          suggestion.difficulty === 'medium' ? 6 : 3,
+          reasoning: suggestion.reasoning,
+          actionable_steps: [suggestion.description], // Use description as primary step
+          related_topics: suggestion.subjects,
+          confidence_score: suggestion.confidence,
+          metadata: {
+            ...suggestion.metadata,
+            difficulty: suggestion.difficulty,
+            estimatedDuration: suggestion.estimatedDuration,
+            tags: suggestion.tags,
+            actions: suggestion.actions || []
+          },
+          expires_at: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString() // 4 hours
+        };
+      });
 
       // Clear old personalized suggestions first
       await supabase
@@ -189,25 +217,40 @@ export async function GET(request: NextRequest) {
     }
 
     // Convert to frontend format
-    const formattedSuggestions = suggestions?.map(suggestion => ({
-      id: suggestion.id,
-      type: mapSuggestionType(suggestion.suggestion_type),
-      title: suggestion.title,
-      description: suggestion.description,
-      priority: suggestion.priority,
-      estimatedImpact: suggestion.estimated_impact,
-      reasoning: suggestion.reasoning,
-      actionableSteps: suggestion.actionable_steps || [suggestion.description],
-      relatedTopics: suggestion.related_topics || [],
-      confidenceScore: suggestion.confidence_score,
-      metadata: {
-        ...suggestion.metadata,
-        difficulty: suggestion.metadata?.difficulty || 'medium',
-        estimatedDuration: suggestion.metadata?.estimatedDuration || 30,
-        tags: suggestion.metadata?.tags || [],
-        actions: suggestion.metadata?.actions || []
+    const formattedSuggestions = suggestions?.map(suggestion => {
+      // Handle priority conversion - support both new (priority_text) and legacy (priority) formats
+      let priority: 'low' | 'medium' | 'high' = 'medium';
+      if (suggestion.priority_text) {
+        priority = suggestion.priority_text.toLowerCase() as 'low' | 'medium' | 'high';
+      } else if (typeof suggestion.priority === 'string') {
+        priority = suggestion.priority.toLowerCase() as 'low' | 'medium' | 'high';
+      } else if (typeof suggestion.priority === 'number') {
+        // Map 1..3 to low/medium/high
+        if (suggestion.priority >= 3) priority = 'high';
+        else if (suggestion.priority === 2) priority = 'medium';
+        else priority = 'low';
       }
-    })) || [];
+      
+      return {
+        id: suggestion.id,
+        type: mapSuggestionType(suggestion.suggestion_type),
+        title: suggestion.title,
+        description: suggestion.description,
+        priority, // String format for frontend
+        estimatedImpact: suggestion.estimated_impact,
+        reasoning: suggestion.reasoning,
+        actionableSteps: suggestion.actionable_steps || [suggestion.description],
+        relatedTopics: suggestion.related_topics || [],
+        confidenceScore: suggestion.confidence_score,
+        metadata: {
+          ...suggestion.metadata,
+          difficulty: suggestion.metadata?.difficulty || 'medium',
+          estimatedDuration: suggestion.metadata?.estimatedDuration || 30,
+          tags: suggestion.metadata?.tags || [],
+          actions: suggestion.metadata?.actions || []
+        }
+      };
+    }) || [];
 
     console.log('✅ Returning', formattedSuggestions.length, 'personalized suggestions');
 

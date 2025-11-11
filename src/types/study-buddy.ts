@@ -289,6 +289,20 @@ export interface StudyBuddyState {
   isSettingsOpen: boolean;
   isContextOpen: boolean;
   profileData: StudentProfileData | null;
+  teachingMode: TeachingModeState;
+}
+
+export interface TeachingModeState {
+  isEnabled: boolean;
+  mode: 'general' | 'personalized';
+  lastActivated: Date | null;
+  activationCount: number;
+  preferences: {
+    explanationDepth: 'basic' | 'detailed' | 'comprehensive';
+    exampleDensity: 'low' | 'medium' | 'high';
+    interactiveMode: boolean;
+    focusAreas: string[];
+  };
 }
 
 export interface StudyBuddyActions {
@@ -301,4 +315,9 @@ export interface StudyBuddyActions {
   toggleContext: () => void;
   exportChat: () => void;
   fetchProfileData: () => Promise<void>;
+  // Teaching mode actions
+  toggleTeachingMode: () => void;
+  setTeachingMode: (enabled: boolean) => void;
+  setTeachingModeType: (mode: 'general' | 'personalized') => void;
+  updateTeachingPreferences: (preferences: Partial<TeachingModeState['preferences']>) => void;
 }

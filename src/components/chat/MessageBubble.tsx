@@ -1,281 +1,252 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { Card } from '@/components/ui/card';
-import { formatDistanceToNow } from 'date-fns';
+import React, { useState } from 'react';
+import {
+  User,
+  Bot,
+  Clock,
+  Zap,
+  Copy,
+  Check,
+  ThumbsUp,
+  ThumbsDown,
+  Brain,
+  Database,
+  MessageCircle,
+  AlertCircle,
+  CheckCircle,
+  XCircle
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Check, ThumbsUp, ThumbsDown, RefreshCw, User, Bot, Settings2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import type { ChatMessage } from '@/types/study-buddy';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import RichContent from './RichContent';
+import type { ChatMessage } from '@/types/study-buddy';
+import { useToast } from '@/hooks/use-toast';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface MessageBubbleProps {
   message: ChatMessage;
-  isStreaming?: boolean;
+  isTyping?: boolean;
+  showMemoryReferences?: boolean;
   className?: string;
-  showHeader?: boolean;
-  isFirstInGroup?: boolean;
-  isLastInGroup?: boolean;
-  onRegenerate?: (message: ChatMessage) => void;
 }
 
-export default function MessageBubble({ message, isStreaming = false, className, showHeader = true, isFirstInGroup = true, isLastInGroup = true, onRegenerate }: MessageBubbleProps) {
-  const [copied, setCopied] = useState(false);
-  const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
+export function MessageBubble({ 
+  message, 
+  isTyping = false, 
+  showMemoryReferences = false,
+  className = '' 
+}: MessageBubbleProps) {
   const { toast } = useToast();
+  const [copied, setCopied] = useState(false);
+  const [liked, setLiked] = useState<boolean | null>(null);
 
-  // Get provider display info
-  const getProviderInfo = (provider?: string) => {
-    if (!provider) return null;
-    
-    const providerMap: Record<string, { name: string; color: string }> = {
-      groq: { name: 'Groq', color: 'bg-purple-500' },
-      cerebras: { name: 'Cerebras', color: 'bg-blue-500' },
-      mistral: { name: 'Mistral', color: 'bg-orange-500' },
-      openrouter: { name: 'OpenRouter', color: 'bg-green-500' },
-      gemini: { name: 'Gemini', color: 'bg-red-500' },
-      cohere: { name: 'Cohere', color: 'bg-yellow-500' },
-    };
-    
-    return providerMap[provider] || { name: provider, color: 'bg-gray-500' };
+  const isUser = message.role === 'user';
+  const isAssistant = message.role === 'assistant';
+
+  // Format timestamp
+  const formatTime = (timestamp: Date | string) => {
+    const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+    return date.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
   };
 
-  const providerInfo = getProviderInfo(message.provider);
-
-  // Copy message content
-  const copyToClipboard = async () => {
+  // Handle copy to clipboard
+  const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(message.content);
       setCopied(true);
       toast({
-        title: 'Copied',
-        description: 'Message copied to clipboard',
+        title: 'Copied!',
+        description: 'Message copied to clipboard.',
       });
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error('Failed to copy message:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to copy message',
-        variant: 'destructive',
-      });
     }
   };
 
   // Handle feedback
-  const handleFeedback = (type: 'like' | 'dislike') => {
-    setFeedback(type);
+  const handleFeedback = (isPositive: boolean) => {
+    setLiked(isPositive);
     toast({
-      title: 'Feedback recorded',
-      description: `Thank you for your ${type === 'like' ? 'positive' : 'negative'} feedback`,
+      title: isPositive ? 'Thanks for the feedback!' : 'Feedback recorded',
+      description: isPositive ? 'I\'m glad this was helpful!' : 'I\'ll work on improving this response.',
     });
   };
 
-  // Format timestamp (relative)
-  const formatTime = (date: Date) => {
-    try {
-      return formatDistanceToNow(date, { addSuffix: true });
-    } catch {
-      return new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit' }).format(date);
+  // Get model badge color
+  const getModelBadgeColor = (provider?: string) => {
+    switch (provider) {
+      case 'groq': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'openai': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      case 'anthropic': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+      case 'gemini': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      case 'cohere': return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200';
+      case 'mistral': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      case 'cerebras': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
     }
   };
-
-  // Get role icon
-  const getRoleIcon = () => {
-    switch (message.role) {
-      case 'user':
-        return <User className="h-4 w-4" />;
-      case 'assistant':
-        return <Bot className="h-4 w-4" />;
-      case 'system':
-        return <Settings2 className="h-4 w-4" />;
-      default:
-        return <Bot className="h-4 w-4" />;
-    }
-  };
-
-  // Get role styling
-  const getRoleStyling = () => {
-    switch (message.role) {
-      case 'user':
-        return {
-          container: 'bg-primary text-primary-foreground ml-auto max-w-[80%]',
-          header: 'text-primary-foreground/70',
-        };
-      case 'assistant':
-        return {
-          container: 'bg-muted mr-auto max-w-[80%]',
-          header: 'text-muted-foreground',
-        };
-      case 'system':
-        return {
-          container: 'bg-muted/50 border border-dashed border-muted-foreground/30 mx-auto max-w-[90%]',
-          header: 'text-muted-foreground',
-        };
-      default:
-        return {
-          container: 'bg-muted mr-auto max-w-[80%]',
-          header: 'text-muted-foreground',
-        };
-    }
-  };
-
-  const roleStyling = getRoleStyling();
 
   return (
     <div className={cn(
-      'flex gap-3 group',
-      message.role === 'user' ? 'flex-row-reverse' : 'flex-row',
+      'flex w-full mb-4',
+      isUser ? 'justify-end' : 'justify-start',
       className
     )}>
-      {/* Avatar */}
       <div className={cn(
-        'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center',
-        message.role === 'user' ? 'bg-primary/20' : 'bg-muted'
+        'flex max-w-[85%] group',
+        isUser ? 'flex-row-reverse' : 'flex-row'
       )}>
-        {getRoleIcon()}
-      </div>
-
-      {/* Message Content */}
-      <div className={cn('flex flex-col gap-1', message.role === 'user' ? 'items-end' : 'items-start')}>
-        {/* Header */}
-        {showHeader && (
-          <div className={cn(
-            'flex items-center gap-2 text-xs px-3 py-1 rounded-lg',
-            roleStyling.header,
-            message.role === 'system' && 'bg-background/50'
-          )}>
-          <span className="font-medium">
-            {message.role === 'user' ? 'You' : 
-             message.role === 'assistant' ? 'AI Assistant' : 'System'}
-          </span>
-          
-          {/* Provider info */}
-          {message.role === 'assistant' && providerInfo && (
-            <>
-              <span>•</span>
-              <div className="flex items-center gap-1">
-                <div className={cn('w-2 h-2 rounded-full', providerInfo.color)} />
-                <span>{providerInfo.name}</span>
-              </div>
-            </>
-          )}
-          
-          {message.model && (
-            <>
-              <span>•</span>
-              <span className="text-muted-foreground">{message.model}</span>
-            </>
-          )}
-          
-          <span>•</span>
-          <span>{formatTime(message.timestamp)}</span>
-          
-          {isStreaming && (
-            <>
-              <span>•</span>
-              <div className="flex items-center gap-1">
-                <RefreshCw className="h-3 w-3 animate-spin" />
-                <span>typing...</span>
-              </div>
-            </>
+        {/* Avatar */}
+        <div className={cn(
+          'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center',
+          isUser 
+            ? 'bg-primary text-primary-foreground ml-2' 
+            : 'bg-muted text-muted-foreground mr-2'
+        )}>
+          {isUser ? (
+            <User className="w-4 h-4" />
+          ) : (
+            <Bot className="w-4 h-4" />
           )}
         </div>
-       )}
 
-        {/* Message Bubble */}
-        <Card className={cn(
-          'p-4 relative group-hover:shadow-sm transition-shadow',
-          roleStyling.container,
-          !isFirstInGroup && 'mt-1',
-          !isLastInGroup && 'mb-1'
-        )}>
-          {/* Message Content */}
-          <div ref={contentRef} className="prose prose-sm dark:prose-invert max-w-none break-words">
-            <RichContent text={message.content} isStreaming={isStreaming} />
-          </div>
-
-          {/* Streaming indicator */}
-          {isStreaming && (
-            <div className="flex items-center gap-1 mt-2 text-xs opacity-70">
-              <div className="flex space-x-1">
-                <div className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-              </div>
-            </div>
-          )}
-        </Card>
-
-        {/* Actions */}
-        {message.role !== 'system' && (
-          <div className={cn(
-            'flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity',
-            message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
+        {/* Message Content */}
+        <div className="flex flex-col space-y-1">
+          {/* Message Bubble */}
+          <Card className={cn(
+            'p-4 shadow-sm',
+            isUser 
+              ? 'bg-primary text-primary-foreground rounded-2xl rounded-br-md' 
+              : 'bg-background border rounded-2xl rounded-bl-md'
           )}>
-            {/* Copy Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={copyToClipboard}
-            >
-              {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-            </Button>
+            <div className="space-y-3">
+              {/* Message Text - Now using MarkdownRenderer */}
+              <div className="markdown-content">
+                <MarkdownRenderer content={message.content} />
+              </div>
 
-            {/* Feedback + Regenerate Buttons */}
-            {message.role === 'assistant' && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "h-6 w-6",
-                    feedback === 'like' && "text-green-600"
-                  )}
-                  onClick={() => handleFeedback('like')}
-                >
-                  <ThumbsUp className="h-3 w-3" />
-                </Button>
-                
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "h-6 w-6",
-                    feedback === 'dislike' && "text-red-600"
-                  )}
-                  onClick={() => handleFeedback('dislike')}
-                >
-                  <ThumbsDown className="h-3 w-3" />
-                </Button>
+              {/* Typing indicator */}
+              {isTyping && (
+                <div className="flex items-center space-x-1 text-muted-foreground">
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-current rounded-full animate-bounce" />
+                    <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                    <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                  </div>
+                  <span className="text-xs">Thinking...</span>
+                </div>
+              )}
+            </div>
+          </Card>
 
-                {onRegenerate && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => onRegenerate(message)}
-                    title="Regenerate response"
-                  >
-                    <RefreshCw className="h-3 w-3" />
-                  </Button>
-                )}
-              </>
+          {/* Message Metadata */}
+          <div className="flex items-center space-x-2 px-1">
+            {/* Timestamp */}
+            <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+              <Clock className="w-3 h-3" />
+              <span>{formatTime(message.timestamp)}</span>
+            </div>
+
+            {/* Model/Provider Info */}
+            {isAssistant && (message.provider || message.model) && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge 
+                      variant="secondary" 
+                      className={cn('text-xs', getModelBadgeColor(message.provider))}
+                    >
+                      <Zap className="w-3 h-3 mr-1" />
+                      {message.model || message.provider}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="text-center">
+                      <p className="font-medium">AI Model Information</p>
+                      {message.provider && <p>Provider: {message.provider}</p>}
+                      {message.model && <p>Model: {message.model}</p>}
+                      {message.tokensUsed && <p>Tokens: {message.tokensUsed}</p>}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
 
-            {/* Token Count */}
-            {message.tokensUsed && (
-              <Badge variant="secondary" className="text-xs px-2 py-0">
-                {message.tokensUsed} tokens
-              </Badge>
+            {/* Memory References */}
+            {showMemoryReferences && message.memory_references && message.memory_references.length > 0 && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="text-xs">
+                      <Database className="w-3 h-3 mr-1" />
+                      {message.memory_references.length}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="text-center">
+                      <p className="font-medium">Memory References</p>
+                      <p>{message.memory_references.length} related memories found</p>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+
+            {/* Action Buttons */}
+            {isAssistant && (
+              <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                {/* Copy Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={handleCopy}
+                >
+                  {copied ? (
+                    <Check className="w-3 h-3 text-green-500" />
+                  ) : (
+                    <Copy className="w-3 h-3" />
+                  )}
+                </Button>
+
+                {/* Feedback Buttons */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={() => handleFeedback(true)}
+                >
+                  <ThumbsUp className={cn(
+                    'w-3 h-3',
+                    liked === true ? 'text-green-500' : 'text-muted-foreground'
+                  )} />
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={() => handleFeedback(false)}
+                >
+                  <ThumbsDown className={cn(
+                    'w-3 h-3',
+                    liked === false ? 'text-red-500' : 'text-muted-foreground'
+                  )} />
+                </Button>
+              </div>
             )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
 }
+
+export default MessageBubble;

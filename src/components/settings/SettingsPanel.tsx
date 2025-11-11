@@ -4,7 +4,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { safeApiCall } from '@/lib/utils/safe-api';
 import type {
@@ -26,17 +27,18 @@ import type {
   NotificationSettings,
   PrivacyControls,
   UsageMonitoring,
-  UsageStatistics
+  UsageStatistics,
+  StudyBuddySettings
 } from '@/types/settings';
 
 // Icons (using Lucide React icons)
-import { 
-  Settings as SettingsIcon, 
-  Brain, 
-  Bell, 
-  Shield, 
-  BarChart3, 
-  Download, 
+import {
+  Settings as SettingsIcon,
+  Brain,
+  Bell,
+  Shield,
+  BarChart3,
+  Download,
   RotateCcw,
   Save,
   AlertTriangle,
@@ -45,7 +47,8 @@ import {
   Zap,
   Users,
   Clock,
-  Target
+  Target,
+  Cpu
 } from 'lucide-react';
 
 interface SettingsPanelProps {
@@ -56,12 +59,23 @@ interface SettingsPanelProps {
 import ThemeToggle from '@/components/ui/theme-toggle';
 
 import ProviderKeysPanel from './ProviderKeysPanel';
+import StudyBuddyTab from './StudyBuddyTab';
 
 export default function SettingsPanel({ userId, onClose }: SettingsPanelProps) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('aiModel');
   const [isLoading, setIsLoading] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [pendingTabChange, setPendingTabChange] = useState<string | null>(null);
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [showCloseDialog, setShowCloseDialog] = useState(false);
+  const originalSettings = useRef<UserSettings | null>(null);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [pendingTabChange, setPendingTabChange] = useState<string | null>(null);
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [showCloseDialog, setShowCloseDialog] = useState(false);
+  const originalSettings = useRef<UserSettings | null>(null);
 
   // Settings state
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -72,6 +86,35 @@ export default function SettingsPanel({ userId, onClose }: SettingsPanelProps) {
   useEffect(() => {
     loadUserSettings();
   }, [userId]);
+
+  // Track unsaved changes
+  useEffect(() => {
+    if (settings && tempSettings) {
+      const hasChanges = JSON.stringify(settings) !== JSON.stringify(tempSettings);
+      setHasUnsavedChanges(hasChanges);
+    }
+  }, [settings, tempSettings]);
+
+  // Store original settings for comparison
+  useEffect(() => {
+    if (settings) {
+      originalSettings.current = JSON.parse(JSON.stringify(settings));
+    }
+  }, [settings]);
+
+  // Handle browser beforeunload event
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   const loadUserSettings = async () => {
     setIsLoading(true);
@@ -317,6 +360,199 @@ export default function SettingsPanel({ userId, onClose }: SettingsPanelProps) {
     setHasUnsavedChanges(true);
   };
 
+  // Enhanced save function with validation
+  const saveSettings = async () => {
+    if (!tempSettings) return;
+
+    // Validate Study Buddy settings if present
+    if (tempSettings.studyBuddy) {
+      let hasErrors = false;
+      Object.entries(tempSettings.studyBuddy.endpoints).forEach(([endpointKey, config]) => {
+        if (config.enabled && (!config.provider || !config.model)) {
+          hasErrors = true;
+        }
+      });
+
+      if (hasErrors) {
+        toast({
+          title: 'Validation Error',
+          description: 'Please ensure all enabled endpoints have provider and model configured',
+          variant: 'destructive'
+        });
+        return;
+      }
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await safeApiCall(`/api/user/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          settings: tempSettings
+        })
+      });
+
+      if (result.isHtmlResponse) {
+        console.warn('⚠️ HTML response detected for save settings:', result.error);
+        toast({
+          title: 'Save Failed',
+          description: 'Received HTML response - please check authentication',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      if (!result.success) {
+        console.error('❌ Failed to save settings:', result.error);
+        toast({
+          title: 'Error',
+          description: result.error || 'Failed to save settings',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      if (result.data.success) {
+        setSettings(tempSettings);
+        setHasUnsavedChanges(false);
+        toast({
+          title: 'Success',
+          description: 'Settings saved successfully',
+          variant: 'default'
+        });
+      } else {
+        throw new Error(result.data.error || 'Failed to save settings');
+      }
+
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save settings',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Enhanced reset function with confirmation dialog
+  const resetSettings = async () => {
+    setShowResetDialog(true);
+  };
+
+  const confirmResetSettings = async () => {
+    setShowResetDialog(false);
+    setIsLoading(true);
+    try {
+      const result = await safeApiCall(`/api/user/settings/reset?userId=${userId}`, {
+        method: 'POST'
+      });
+
+      if (result.isHtmlResponse) {
+        console.warn('⚠️ HTML response detected for reset settings:', result.error);
+        toast({
+          title: 'Reset Failed',
+          description: 'Received HTML response - please check authentication',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      if (!result.success) {
+        console.error('❌ Failed to reset settings:', result.error);
+        toast({
+          title: 'Error',
+          description: result.error || 'Failed to reset settings',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      if (result.data.success) {
+        setSettings(result.data.data);
+        setTempSettings(result.data.data);
+        setHasUnsavedChanges(false);
+        toast({
+          title: 'Success',
+          description: 'Settings reset to defaults',
+          variant: 'default'
+        });
+      } else {
+        console.error('❌ Reset failed:', result.data.error);
+        toast({
+          title: 'Error',
+          description: result.data.error || 'Failed to reset settings',
+          variant: 'destructive'
+        });
+      }
+
+    } catch (error) {
+      console.error('Failed to reset settings:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to reset settings',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Enhanced close function with unsaved changes check
+  const handleClose = () => {
+    if (hasUnsavedChanges) {
+      setShowCloseDialog(true);
+    } else {
+      onClose?.();
+    }
+  };
+
+  // Handle tab changes with unsaved changes check
+  const handleTabChange = (newTab: string) => {
+    if (hasUnsavedChanges) {
+      setPendingTabChange(newTab);
+      setShowUnsavedDialog(true);
+    } else {
+      setActiveTab(newTab);
+    }
+  };
+
+  // Confirm navigation away from current tab
+  const confirmTabChange = () => {
+    if (pendingTabChange) {
+      setActiveTab(pendingTabChange);
+      setPendingTabChange(null);
+    }
+    setShowUnsavedDialog(false);
+  };
+
+  // Discard changes and navigate
+  const discardChangesAndNavigate = () => {
+    if (originalSettings.current) {
+      setTempSettings(originalSettings.current);
+      setHasUnsavedChanges(false);
+    }
+    confirmTabChange();
+  };
+
+  // Confirm close without saving
+  const confirmClose = () => {
+    setShowCloseDialog(false);
+    onClose?.();
+  };
+
+  // Discard changes and close
+  const discardChangesAndClose = () => {
+    if (originalSettings.current) {
+      setTempSettings(originalSettings.current);
+      setHasUnsavedChanges(false);
+    }
+    confirmClose();
+  };
+
   if (isLoading && !settings) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -342,6 +578,11 @@ export default function SettingsPanel({ userId, onClose }: SettingsPanelProps) {
     );
   }
 
+  console.log('🔧 SettingsPanel: Rendering with activeTab:', activeTab);
+  console.log('🔧 SettingsPanel: Settings state:', settings);
+  console.log('🔧 SettingsPanel: TempSettings state:', tempSettings);
+  console.log('🔧 SettingsPanel: Has StudyBuddy settings:', !!tempSettings?.studyBuddy);
+
   return (
     <div className="w-full max-w-4xl mx-auto">
       <Card>
@@ -365,17 +606,44 @@ export default function SettingsPanel({ userId, onClose }: SettingsPanelProps) {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {hasUnsavedChanges && (
-                <Badge variant="secondary" className="animate-pulse">
-                  Unsaved Changes
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="animate-pulse text-xs">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    Unsaved Changes
+                  </Badge>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                          onClick={() => {
+                            if (originalSettings.current) {
+                              setTempSettings(originalSettings.current);
+                              setHasUnsavedChanges(false);
+                            }
+                          }}
+                          aria-label="Discard all unsaved changes"
+                        >
+                          <Undo2 className="h-3 w-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        Discard all unsaved changes
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
               )}
               <Button
                 variant="outline"
                 size="sm"
                 onClick={exportSettings}
                 disabled={isLoading}
+                className="transition-all hover:scale-105"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Export
@@ -385,6 +653,7 @@ export default function SettingsPanel({ userId, onClose }: SettingsPanelProps) {
                 size="sm"
                 onClick={resetSettings}
                 disabled={isLoading}
+                className="transition-all hover:scale-105"
               >
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Reset
@@ -392,18 +661,27 @@ export default function SettingsPanel({ userId, onClose }: SettingsPanelProps) {
               <Button
                 onClick={saveSettings}
                 disabled={!hasUnsavedChanges || isLoading}
-                className="bg-primary"
+                className="bg-primary hover:bg-primary/90 transition-all hover:scale-105"
               >
                 <Save className="h-4 w-4 mr-2" />
                 Save Changes
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClose}
+                className="h-8 w-8 p-0 transition-all hover:scale-105 hover:bg-destructive/10 hover:text-destructive"
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close settings</span>
               </Button>
             </div>
           </div>
         </CardHeader>
 
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="aiModel" className="flex items-center gap-2">
                 <Brain className="h-4 w-4" />
                 AI Models
@@ -423,6 +701,10 @@ export default function SettingsPanel({ userId, onClose }: SettingsPanelProps) {
               <TabsTrigger value="usage" className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4" />
                 Usage
+              </TabsTrigger>
+              <TabsTrigger value="studyBuddy" className="flex items-center gap-2">
+                <Cpu className="h-4 w-4" />
+                Study Buddy
               </TabsTrigger>
             </TabsList>
 
@@ -466,6 +748,25 @@ export default function SettingsPanel({ userId, onClose }: SettingsPanelProps) {
                 onChange={(updates) => updateTempSettings({ usage: { ...tempSettings.usage, ...updates } })}
               />
             </TabsContent>
+
+            {/* Tab 6: Study Buddy AI Endpoint Configuration */}
+            <TabsContent value="studyBuddy" className="space-y-6">
+              {tempSettings?.studyBuddy ? (
+                <StudyBuddyTab
+                  settings={tempSettings.studyBuddy}
+                  onChange={(updates) => updateTempSettings({ studyBuddy: { ...tempSettings.studyBuddy, ...updates } })}
+                  onRequestSave={saveSettings}
+                />
+              ) : (
+                <div className="text-center py-8">
+                  <div className="animate-pulse space-y-2">
+                    <div className="h-4 bg-muted rounded w-1/4 mx-auto"></div>
+                    <div className="h-8 bg-muted rounded w-1/2 mx-auto"></div>
+                  </div>
+                  <p className="text-muted-foreground mt-4">Loading Study Buddy settings...</p>
+                </div>
+              )}
+            </TabsContent>
           </Tabs>
 
 <section className="mt-6">
@@ -474,6 +775,280 @@ export default function SettingsPanel({ userId, onClose }: SettingsPanelProps) {
         </CardContent>
       </Card>
     </div>
+  );
+
+  // Unsaved Changes Dialog
+  const UnsavedChangesDialog = () => (
+    <Dialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-yellow-500" />
+            Unsaved Changes
+          </DialogTitle>
+          <DialogDescription>
+            You have unsaved changes. What would you like to do?
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="sm:justify-between space-y-2 sm:space-y-0 sm:space-x-2 flex flex-col sm:flex-row">
+          <Button
+            variant="outline"
+            onClick={() => setShowUnsavedDialog(false)}
+            className="flex-1"
+          >
+            Continue Editing
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={discardChangesAndNavigate}
+            className="flex-1"
+          >
+            Discard Changes
+          </Button>
+          <Button
+            onClick={confirmTabChange}
+            className="flex-1 bg-primary hover:bg-primary/90"
+          >
+            Save Changes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  // Reset Confirmation Dialog
+  const ResetConfirmationDialog = () => (
+    <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <RotateCw className="h-5 w-5 text-destructive" />
+            Reset Settings
+          </DialogTitle>
+          <DialogDescription>
+            This will reset all your settings to their default values. This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="sm:justify-between space-y-2 sm:space-y-0 sm:space-x-2 flex flex-col sm:flex-row">
+          <Button
+            variant="outline"
+            onClick={() => setShowResetDialog(false)}
+            disabled={isLoading}
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={confirmResetSettings}
+            disabled={isLoading}
+            className="flex-1"
+          >
+            {isLoading ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Resetting...
+              </>
+            ) : (
+              'Reset to Defaults'
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  // Close Confirmation Dialog
+  const CloseConfirmationDialog = () => (
+    <Dialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <X className="h-5 w-5 text-destructive" />
+            Unsaved Changes
+          </DialogTitle>
+          <DialogDescription>
+            You have unsaved changes. Are you sure you want to close without saving?
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="sm:justify-between space-y-2 sm:space-y-0 sm:space-x-2 flex flex-col sm:flex-row">
+          <Button
+            variant="outline"
+            onClick={() => setShowCloseDialog(false)}
+            className="flex-1"
+          >
+            Continue Editing
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={discardChangesAndClose}
+            className="flex-1"
+          >
+            Discard & Close
+          </Button>
+          <Button
+            onClick={saveSettings}
+            disabled={isLoading}
+            className="flex-1 bg-primary hover:bg-primary/90"
+          >
+            {isLoading ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              'Save & Close'
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  return (
+    <>
+      {SettingsPanelContent}
+      <UnsavedChangesDialog />
+      <ResetConfirmationDialog />
+      <CloseConfirmationDialog />
+    </>
+  );
+
+  // Unsaved Changes Dialog
+  const UnsavedChangesDialog = () => (
+    <Dialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-yellow-500" />
+            Unsaved Changes
+          </DialogTitle>
+          <DialogDescription>
+            You have unsaved changes. What would you like to do?
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="sm:justify-between space-y-2 sm:space-y-0 sm:space-x-2 flex flex-col sm:flex-row">
+          <Button
+            variant="outline"
+            onClick={() => setShowUnsavedDialog(false)}
+            className="flex-1"
+          >
+            Continue Editing
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={discardChangesAndNavigate}
+            className="flex-1"
+          >
+            Discard Changes
+          </Button>
+          <Button
+            onClick={confirmTabChange}
+            className="flex-1 bg-primary hover:bg-primary/90"
+          >
+            Save Changes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  // Reset Confirmation Dialog
+  const ResetConfirmationDialog = () => (
+    <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <RotateCcw className="h-5 w-5 text-destructive" />
+            Reset Settings
+          </DialogTitle>
+          <DialogDescription>
+            This will reset all your settings to their default values. This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="sm:justify-between space-y-2 sm:space-y-0 sm:space-x-2 flex flex-col sm:flex-row">
+          <Button
+            variant="outline"
+            onClick={() => setShowResetDialog(false)}
+            disabled={isLoading}
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={confirmResetSettings}
+            disabled={isLoading}
+            className="flex-1"
+          >
+            {isLoading ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Resetting...
+              </>
+            ) : (
+              'Reset to Defaults'
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  // Close Confirmation Dialog
+  const CloseConfirmationDialog = () => (
+    <Dialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <X className="h-5 w-5 text-destructive" />
+            Unsaved Changes
+          </DialogTitle>
+          <DialogDescription>
+            You have unsaved changes. Are you sure you want to close without saving?
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="sm:justify-between space-y-2 sm:space-y-0 sm:space-x-2 flex flex-col sm:flex-row">
+          <Button
+            variant="outline"
+            onClick={() => setShowCloseDialog(false)}
+            className="flex-1"
+          >
+            Continue Editing
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={discardChangesAndClose}
+            className="flex-1"
+          >
+            Discard & Close
+          </Button>
+          <Button
+            onClick={saveSettings}
+            disabled={isLoading}
+            className="flex-1 bg-primary hover:bg-primary/90"
+          >
+            {isLoading ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              'Save & Close'
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  return (
+    <>
+      {SettingsPanelContent}
+      <UnsavedChangesDialog />
+      <ResetConfirmationDialog />
+      <CloseConfirmationDialog />
+    </>
   );
 }
 

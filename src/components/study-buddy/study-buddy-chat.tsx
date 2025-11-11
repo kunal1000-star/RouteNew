@@ -489,7 +489,7 @@ export function StudyBuddyChat({
                 variant={quickFeedback === 'positive' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => handleQuickFeedback('positive')}
-                className="h-7 w-7 p-0"
+                className="h-11 w-11 p-0"
               >
                 <ThumbsUp className="h-3 w-3" />
               </Button>
@@ -497,7 +497,7 @@ export function StudyBuddyChat({
                 variant={quickFeedback === 'negative' ? 'destructive' : 'outline'}
                 size="sm"
                 onClick={() => handleQuickFeedback('negative')}
-                className="h-7 w-7 p-0"
+                className="h-11 w-11 p-0"
               >
                 <ThumbsDown className="h-3 w-3" />
               </Button>
@@ -508,7 +508,7 @@ export function StudyBuddyChat({
               variant="outline"
               size="sm"
               onClick={trackLearningProgress}
-              className="h-7"
+              className="h-11"
             >
               <Activity className="h-3 w-3 mr-1" />
               Progress
@@ -519,7 +519,7 @@ export function StudyBuddyChat({
               variant="outline"
               size="sm"
               onClick={recognizeStudyPatterns}
-              className="h-7"
+              className="h-11"
             >
               <TrendingUp className="h-3 w-3 mr-1" />
               Patterns

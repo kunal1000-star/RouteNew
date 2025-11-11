@@ -1,0 +1,127 @@
+{
+  "timestamp": "2025-11-11T07:38:51.567Z",
+  "testResults": {
+    "passed": 8,
+    "failed": 5,
+    "warnings": 0,
+    "errors": [
+      {
+        "test": "Memory Storage Functionality",
+        "message": "Memory storage failed",
+        "details": {
+          "success": false,
+          "error": {
+            "code": "DATABASE_ERROR",
+            "message": "Failed to store memory in database",
+            "details": "invalid input syntax for type uuid: \"conv-advanced-ai-validation-123\""
+          },
+          "metadata": {
+            "requestId": "ai-memory-1762846720504-5mc9b26b6",
+            "processingTime": 368,
+            "timestamp": "2025-11-11T07:38:40.872Z"
+          }
+        }
+      },
+      {
+        "test": "Memory Context Formatting",
+        "message": "No context string generated",
+        "details": {
+          "memories": [],
+          "searchStats": {
+            "totalFound": 0,
+            "searchTimeMs": 310,
+            "searchType": "hybrid",
+            "minSimilarityApplied": 0.6,
+            "averageSimilarity": 0,
+            "contextLevel": "comprehensive",
+            "embeddingGenerated": true,
+            "fallbackUsed": false
+          },
+          "metadata": {
+            "requestId": "semantic-search-1762846724888-kdxxvow3l",
+            "processingTime": 310,
+            "timestamp": "2025-11-11T07:38:45.198Z"
+          }
+        }
+      },
+      {
+        "test": "Study Buddy Memory Integration",
+        "message": "Study buddy responded with memory integration",
+        "details": {
+          "success": true,
+          "data": {
+            "aiResponse": {
+              "content": "I'd be happy to help you with your math exam. Since you're on BlockWise, I'm assuming you're working on a particular block related to math.\n\nTo get started, can you tell me which block you're currently working on or what specific math topic you're struggling with? This will help me provide you with more targeted support and guidance.\n\nAlso, don't forget that you've completed 35/50 blocks and have an accuracy of 78%. You're making great progress!\n\nI hope this information is helpful for you!",
+              "model_used": "llama-3.1-8b-instant",
+              "provider_used": "groq",
+              "tokens_used": 193,
+              "latency_ms": 364,
+              "query_type": "personal",
+              "web_search_enabled": false,
+              "fallback_used": false,
+              "cached": true
+            },
+            "integrationStatus": {
+              "personalization_system": true,
+              "teaching_system": false,
+              "memory_system": false,
+              "web_search_system": false,
+              "hallucination_prevention_layers": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "memories_found": 0
+            },
+            "personalizedSuggestions": {
+              "enabled": true,
+              "message": "All advanced AI systems are now integrated and working!",
+              "systems_active": 6,
+              "layers_active": 5
+            }
+          },
+          "metadata": {
+            "requestId": "ai-chat-1762846726579-nxfsaius7",
+            "processingTime": 1049,
+            "timestamp": "2025-11-11T07:38:47.628Z",
+            "integration": "COMPREHENSIVE - ALL SYSTEMS ACTIVE"
+          },
+          "studyBuddy": {
+            "isStudyBuddy": true,
+            "queryType": "educational",
+            "conversationId": "conv-advanced-ai-validation-123",
+            "userId": "test-advanced-ai-validation-user-123",
+            "timestamp": "2025-11-11T07:38:47.642Z",
+            "features": {
+              "memoryIntegration": true,
+              "hallucinationPrevention": true,
+              "personalization": true,
+              "educationalContent": true
+            }
+          }
+        }
+      },
+      {
+        "test": "Memory Search Performance",
+        "message": "Search time: 1398ms",
+        "details": {
+          "searchTime": 1398
+        }
+      },
+      {
+        "test": "Layer 1 Memory Integration",
+        "message": "Layer 1 missing memory integration",
+        "details": null
+      }
+    ]
+  },
+  "successRate": 61.53846153846154,
+  "assessment": "NEEDS_ATTENTION",
+  "recommendations": [
+    "Fix failed memory system tests before production deployment",
+    "Optimize memory system performance for production workloads",
+    "Improve integration between memory system and other AI components"
+  ]
+}

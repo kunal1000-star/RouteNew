@@ -25,7 +25,7 @@ import { searchMemories, MemorySearchRequest, MemorySearchResult, storeMemory } 
 
 const DEFAULT_PREFERENCES: ChatPreferences = {
   provider: 'groq',
-  model: '',
+  model: 'llama-3.1-8b-instant',
   streamResponses: true,
   temperature: 0.7,
   maxTokens: 2048,
@@ -56,6 +56,19 @@ const DEFAULT_PROFILE_DATA: StudentProfileData = {
     revisionQueue: 0
   },
   lastUpdated: new Date().toISOString()
+};
+
+const DEFAULT_TEACHING_MODE: TeachingModeState = {
+  isEnabled: false,
+  mode: 'general',
+  lastActivated: null,
+  activationCount: 0,
+  preferences: {
+    explanationDepth: 'detailed',
+    exampleDensity: 'medium',
+    interactiveMode: false,
+    focusAreas: []
+  }
 };
 
 // Enhanced interfaces for Layer 2 integration
@@ -106,6 +119,9 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isContextOpen, setIsContextOpen] = useState(false);
   const [profileData, setProfileData] = useState<StudentProfileData | null>(null);
+  
+  // Teaching mode state
+  const [teachingMode, setTeachingModeState] = useState<TeachingModeState>(DEFAULT_TEACHING_MODE);
 
   // Layer 2 enhanced state
   const [enhancedContext, setEnhancedContext] = useState<EnhancedContext | null>(null);
@@ -182,6 +198,13 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
         const context = JSON.parse(savedContext);
         setStudyContext(prev => ({ ...prev, ...context }));
       }
+      
+      // Load teaching mode from localStorage
+      const savedTeachingMode = localStorage.getItem('study-buddy-teaching-mode');
+      if (savedTeachingMode) {
+        const teachingModeData = JSON.parse(savedTeachingMode);
+        setTeachingMode(prev => ({ ...prev, ...teachingModeData }));
+      }
     } catch (error) {
       console.error('Error loading preferences:', error);
     }
@@ -204,9 +227,28 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
     }
   };
 
+  // Provider to default model mapping
+  const getDefaultModelForProvider = (provider: string): string => {
+    const modelMapping: Record<string, string> = {
+      'groq': 'llama-3.1-8b-instant',
+      'openrouter': 'minimax/minimax-m2:free',
+      'gemini': 'gemini-1.5-flash',
+      'cerebras': 'llama3.1-8b',
+      'mistral': 'mistral-7b-instruct',
+      'cohere': 'command'
+    };
+    return modelMapping[provider] || 'llama-3.1-8b-instant';
+  };
+
   // Save preferences to localStorage
   const savePreferences = useCallback((newPreferences: Partial<ChatPreferences>) => {
     const updated = { ...preferences, ...newPreferences };
+    
+    // Auto-select default model when provider changes
+    if (newPreferences.provider && newPreferences.provider !== preferences.provider) {
+      updated.model = getDefaultModelForProvider(newPreferences.provider);
+    }
+    
     setPreferences(updated);
     localStorage.setItem('study-buddy-preferences', JSON.stringify({
       provider: updated.provider,
@@ -221,6 +263,12 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
   const saveStudyContext = useCallback((context: StudyContext) => {
     setStudyContext(context);
     localStorage.setItem('study-buddy-study-context', JSON.stringify(context));
+  }, []);
+
+  // Save teaching mode to localStorage
+  const saveTeachingMode = useCallback((teachingModeState: TeachingModeState) => {
+    setTeachingModeState(teachingModeState);
+    localStorage.setItem('study-buddy-teaching-mode', JSON.stringify(teachingModeState));
   }, []);
 
   // Save chat history to localStorage
@@ -258,9 +306,42 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
   // Detect if question is personal (enhanced with Layer 1 integration)
   const detectPersonalQuestion = (message: string): boolean => {
     const lowerMessage = message.toLowerCase();
-    return personalQuestionKeywords.some(keyword => 
-      lowerMessage.includes(keyword)
-    );
+    
+    // Enhanced keyword matching for better personal question detection
+    const enhancedKeywords = [
+      'mera', 'my', 'performance', 'progress', 'weak', 'strong', 'score', 'analysis',
+      'revision', 'kaise chal raha', 'improvement', 'help me', 'suggest', 'strategy', 'schedule',
+      'my name', 'do you know', 'who am i', 'what is my', 'remember', 'recall', 'past',
+      'earlier', 'before', 'previous', 'last time', 'how am i doing', 'am i improving',
+      'my strengths', 'my weaknesses', 'my scores', 'my results', 'my grades', 'mera naam',
+      'mera progress', 'mera performance', 'mera weak', 'mera strong', 'mera score'
+    ];
+    
+    // Check for exact matches first
+    const exactMatches = enhancedKeywords.some(keyword => lowerMessage.includes(keyword));
+    
+    // Additional pattern matching for more complex personal queries
+    const personalPatterns = [
+      /\bmy\s+(name|progress|performance|score|grade|result)\b/i,
+      /\b(do you know|remember|recall)\s+my\s+\w+/i,
+      /\b(who|what)\s+am\s+i\b/i,
+      /\bhow\s+am\s+i\s+(doing|performing)\b/i,
+      /\bmera\s+\w+/i
+    ];
+    
+    const patternMatches = personalPatterns.some(pattern => pattern.test(message));
+    
+    const isPersonal = exactMatches || patternMatches;
+    
+    if (isPersonal) {
+      console.log('🎯 Personal question detected:', {
+        message: message.substring(0, 50),
+        exactMatches,
+        patternMatches
+      });
+    }
+    
+    return isPersonal;
   };
 
   // Add message to chat
@@ -536,6 +617,22 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
     }
   }, [userId, buildEnhancedStudyContext, getRelevantStudyMemories]);
 
+  // Detect time range in user query (e.g., '5 months ago')
+  const detectTimeRange = (text: string): { since?: string } | undefined => {
+    try {
+      const m = text.toLowerCase().match(/(\d+)\s*(months|month|mahine|mahina)\s*(ago|pehle)/);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (!isNaN(n) && n > 0 && n < 60) {
+          const since = new Date();
+          since.setMonth(since.getMonth() - n);
+          return { since: since.toISOString() };
+        }
+      }
+    } catch {}
+    return undefined;
+  };
+
   // Main message sending function (enhanced with Layer 2)
   const handleSendMessage = async (content: string, attachments?: File[]) => {
     if (!content.trim() && (!attachments || attachments.length === 0)) return;
@@ -592,11 +689,12 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
         message: content,
         chatType: 'study_assistant',
         isPersonalQuery: isPersonalQuery,
-        provider: preferences.provider
+        provider: preferences.provider,
+        model: preferences.model
       };
 
       if (preferences.streamResponses) {
-        // Handle streaming response using the Study Buddy specific endpoint
+        // Handle streaming response using the unified endpoint with sentence-level chunks
         const assistantMessageId = addMessage({
           role: 'assistant',
           content: '',
@@ -604,91 +702,105 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
         });
 
         try {
+          // FIXED: Call the correct study-buddy endpoint with proper authentication
           const session = await supabaseBrowserClient.auth.getSession();
           const accessToken = session.data.session?.access_token;
+          
           if (!accessToken) {
-            toast({ variant: 'destructive', title: 'Session expired', description: 'Please sign in again to continue.' });
-            updateMessage(assistantMessageId, { content: 'Please sign in to continue.', streaming: false });
-            setIsLoading(false);
-            router.push('/auth');
-            return;
+            console.warn('Study Buddy: No auth token available, attempting unauthenticated request');
           }
           
-          // Use the Study Buddy specific endpoint with memory integration
-          const response = await fetch('/api/study-buddy', {
+          const response = await fetch('/api/study-buddy?stream=true', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${accessToken}`,
+              ...(accessToken && { 'Authorization': `Bearer ${accessToken}` })
             },
-            body: JSON.stringify(requestBody),
+            body: JSON.stringify({
+              message: content,
+              userId,
+              conversationId: serverConversationIdToSend,
+              provider: preferences.provider,
+              model: preferences.model,
+              context: {
+                chatType: 'study_assistant',
+                isPersonalQuery: isPersonalQuery,
+                includeMemoryContext: true,
+                includePersonalizedSuggestions: true,
+                studyData: true,
+                webSearch: 'auto',
+                timeRange: detectTimeRange(content),
+                memoryOptions: {
+                  query: isPersonalQuery ? content : undefined,
+                  limit: 5,
+                  minSimilarity: 0.1,
+                  searchType: 'hybrid',
+                  contextLevel: 'balanced'
+                }
+              }
+            })
           });
 
-          if (!response.ok) {
+          if (!response.ok || !response.body) {
             throw new Error(`HTTP error! status: ${response.status}`);
           }
 
-          const data = await response.json();
-
-          // Sync local conversationId with server-assigned UUID
-          if (data?.data?.conversationId) {
-            setConversationId(data.data.conversationId);
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let accumulated = '';
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            accumulated += chunk;
+            updateMessage(assistantMessageId, { content: accumulated });
           }
-
-          if (data.success && data.data && data.data.response) {
-            console.log('✅ Setting assistant message from Study Buddy API with memory');
-            
-            // Update memory references if memory context was found
-            if (data.data.memoryContext && data.data.memoryContext.memoriesFound > 0) {
-              console.log(`Memory: Found ${data.data.memoryContext.memoriesFound} relevant memories for personalized response`);
-            }
-
-            updateMessage(assistantMessageId, {
-              content: data.data.response.content,
-              provider: data.data.response.provider_used,
-              model: data.data.response.model_used,
-              tokensUsed: (data.data.response.tokens_used?.output || 0) + (data.data.response.tokens_used?.input || 0),
-              streaming: false,
-              memory_references: data.data.response.memory_references || []
-            });
-          } else {
-            console.log('⚠️  Study Buddy API response not successful, using fallback response');
-            const errorMessage = data.error?.message || 'I apologize, but I encountered an issue processing your request. Please try again, and I\'ll do my best to help you with your studies!';
-            updateMessage(assistantMessageId, {
-              content: errorMessage,
-              streaming: false,
-            });
-          }
-
+          updateMessage(assistantMessageId, { streaming: false });
         } catch (streamError) {
-          console.error('Study Buddy API failed:', streamError);
-
-          // Add error message to chat
-          const errorMessage = streamError instanceof Error ? streamError.message : String(streamError);
+          console.error('Unified chat streaming failed:', streamError);
           updateMessage(assistantMessageId, {
-            content: 'I apologize, but I encountered an error while helping you. Please try again, and I\'ll do my best to assist you with your studies!',
+            content: 'I apologize, but I encountered a streaming issue. Please try again.',
             streaming: false,
           });
         }
       } else {
-        // Handle regular (non-streaming) response using the Study Buddy specific endpoint
-        const session2 = await supabaseBrowserClient.auth.getSession();
-        const accessToken2 = session2.data.session?.access_token;
-        if (!accessToken2) {
-          toast({ variant: 'destructive', title: 'Session expired', description: 'Please sign in again to continue.' });
-          setIsLoading(false);
-          router.push('/auth');
-          return;
+        // Handle regular (non-streaming) response using the study-buddy endpoint
+        const session = await supabaseBrowserClient.auth.getSession();
+        const accessToken = session.data.session?.access_token;
+        
+        if (!accessToken) {
+          console.warn('Study Buddy: No auth token available, attempting unauthenticated request');
         }
         
-        // Use the Study Buddy specific endpoint with memory integration
         const response = await fetch('/api/study-buddy', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken2}`,
+            ...(accessToken && { 'Authorization': `Bearer ${accessToken}` })
           },
-          body: JSON.stringify(requestBody),
+          body: JSON.stringify({
+            message: content,
+            userId,
+            conversationId: serverConversationIdToSend,
+            provider: preferences.provider,
+            model: preferences.model,
+            context: {
+              chatType: 'study_assistant',
+              isPersonalQuery: isPersonalQuery,
+              includeMemoryContext: true,
+              includePersonalizedSuggestions: true,
+              studyData: true,
+              webSearch: 'auto',
+              timeRange: detectTimeRange(content),
+              memoryOptions: {
+                query: isPersonalQuery ? content : undefined,
+                limit: 5,
+                minSimilarity: 0.1,
+                searchType: 'hybrid',
+                contextLevel: 'balanced'
+              }
+            }
+          })
         });
 
         if (!response.ok) {
@@ -697,34 +809,17 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
 
         const data = await response.json();
 
-        // Sync local conversationId with server-assigned UUID
-        if (data?.data?.conversationId) {
-          setConversationId(data.data.conversationId);
-        }
-
-        if (data.success && data.data && data.data.response) {
-          console.log('✅ Setting assistant message from Study Buddy API with memory (non-streaming)');
-          
-          // Update memory references if memory context was found
-          if (data.data.memoryContext && data.data.memoryContext.memoriesFound > 0) {
-            console.log(`Memory: Found ${data.data.memoryContext.memoriesFound} relevant memories for personalized response`);
-          }
-
+        if (data.success && data.data && data.data.aiResponse) {
           addMessage({
             role: 'assistant',
-            content: data.data.response.content,
-            provider: data.data.response.provider_used,
-            model: data.data.response.model_used,
-            tokensUsed: (data.data.response.tokens_used?.output || 0) + (data.data.response.tokens_used?.input || 0),
-            memory_references: data.data.response.memory_references || []
+            content: data.data.aiResponse.content,
+            provider: data.data.aiResponse.provider_used,
+            model: data.data.aiResponse.model_used,
+            tokensUsed: data.data.aiResponse.tokens_used || 0,
           });
         } else {
-          console.log('⚠️  Study Buddy API response not successful, using fallback response (non-streaming)');
-          const errorMessage = data.error?.message || 'I apologize, but I encountered an issue processing your request. Please try again, and I\'ll do my best to help you with your studies!';
-          addMessage({
-            role: 'assistant',
-            content: errorMessage,
-          });
+          const errorMessage = data.error?.message || 'I encountered an issue processing your request. Please try again.';
+          addMessage({ role: 'assistant', content: errorMessage });
         }
       }
 
@@ -808,6 +903,44 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
     setIsContextOpen(prev => !prev);
   };
 
+  // Teaching mode functions
+  const toggleTeachingMode = () => {
+    setTeachingModeState(prev => ({
+      ...prev,
+      isEnabled: !prev.isEnabled,
+      lastActivated: !prev.isEnabled ? new Date() : prev.lastActivated,
+      activationCount: !prev.isEnabled ? prev.activationCount + 1 : prev.activationCount
+    }));
+  };
+
+  const activateTeachingMode = (enabled: boolean) => {
+    setTeachingModeState(prev => ({
+      ...prev,
+      isEnabled: enabled,
+      lastActivated: enabled ? new Date() : prev.lastActivated,
+      activationCount: enabled ? prev.activationCount + 1 : prev.activationCount
+    }));
+  };
+
+  const setTeachingModeType = (mode: 'general' | 'personalized') => {
+    setTeachingModeState(prev => ({
+      ...prev,
+      mode,
+      lastActivated: new Date()
+    }));
+  };
+
+  const updateTeachingPreferences = (preferences: Partial<TeachingModeState['preferences']>) => {
+    setTeachingModeState(prev => ({
+      ...prev,
+      preferences: {
+        ...prev.preferences,
+        ...preferences
+      },
+      lastActivated: new Date()
+    }));
+  };
+
   // Export chat
   const exportChat = () => {
     const chatData = {
@@ -836,32 +969,83 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
     });
   };
 
-  // Fetch profile data - FIXED VERSION
+  // Fetch profile data - ENHANCED VERSION with better error handling
   const fetchProfileData = async () => {
+    if (!userId) {
+      console.log('⚠️  Cannot fetch profile: no user ID available');
+      setProfileData(DEFAULT_PROFILE_DATA);
+      return;
+    }
+
     try {
       console.log('🔍 Fetching student profile for userId:', userId);
       
-      const response = await fetch(`/api/student/profile?userId=${userId}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const response = await fetch(`/api/student/profile?userId=${userId}`, {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
       
       console.log('📡 Profile API response status:', response.status);
 
-      const data = await response.json();
-      
-      console.log('📋 Profile API response data:', data);
+      if (!response.ok) {
+        console.warn('⚠️  Profile API returned non-OK status:', response.status);
+        // Still try to parse response for potential data
+      }
 
-      // Check if we have valid data in the response, regardless of status code
-      if (data && data.data) {
+      let data;
+      try {
+        data = await response.json();
+        console.log('📋 Profile API response data:', {
+          hasData: !!data?.data,
+          dataType: typeof data?.data,
+          keys: data?.data ? Object.keys(data.data) : 'none'
+        });
+      } catch (parseError) {
+        console.warn('⚠️  Failed to parse profile response, using defaults:', parseError);
+        setProfileData(DEFAULT_PROFILE_DATA);
+        return;
+      }
+
+      // Check if we have valid data in the response
+      if (data && data.data && typeof data.data === 'object') {
         console.log('✅ Setting profile data from API response');
-        setProfileData(data.data);
+        
+        // Validate and sanitize the profile data
+        const sanitizedProfile = {
+          profileText: data.data.profileText || DEFAULT_PROFILE_DATA.profileText,
+          strongSubjects: Array.isArray(data.data.strongSubjects) ? data.data.strongSubjects : [],
+          weakSubjects: Array.isArray(data.data.weakSubjects) ? data.data.weakSubjects : [],
+          studyProgress: {
+            totalTopics: typeof data.data.studyProgress?.totalTopics === 'number' ? data.data.studyProgress.totalTopics : 0,
+            completedTopics: typeof data.data.studyProgress?.completedTopics === 'number' ? data.data.studyProgress.completedTopics : 0,
+            accuracy: typeof data.data.studyProgress?.accuracy === 'number' ? data.data.studyProgress.accuracy : 0
+          },
+          currentData: {
+            streak: typeof data.data.currentData?.streak === 'number' ? data.data.currentData.streak : 0,
+            level: typeof data.data.currentData?.level === 'number' ? data.data.currentData.level : 1,
+            points: typeof data.data.currentData?.points === 'number' ? data.data.currentData.points : 0,
+            revisionQueue: typeof data.data.currentData?.revisionQueue === 'number' ? data.data.currentData.revisionQueue : 0
+          },
+          lastUpdated: data.data.lastUpdated || new Date().toISOString()
+        };
+        
+        setProfileData(sanitizedProfile);
       } else {
         console.log('⚠️  No valid profile data in response, using defaults');
-        // Set default profile data if response doesn't have valid data
         setProfileData(DEFAULT_PROFILE_DATA);
       }
     } catch (error) {
       console.error('❌ Error fetching student profile:', error);
       
-      // Set default profile data on any error - THIS FIXES THE CONSOLE ERROR
+      if (error.name === 'AbortError') {
+        console.warn('⚠️  Profile fetch timed out, using defaults');
+      }
+      
+      // Set default profile data on any error
       console.log('🔄 Setting default profile data due to error');
       setProfileData(DEFAULT_PROFILE_DATA);
     }
@@ -883,6 +1067,9 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
     // Enhanced Layer 2 State
     enhancedContext,
     layer2Context,
+    
+    // Teaching mode state
+    teachingMode,
 
     // Actions
     initializeSession,
@@ -906,5 +1093,12 @@ export function useStudyBuddy(): EnhancedStudyBuddyState & EnhancedStudyBuddyAct
     getTokenUsage,
     storeStudyInteraction,
     getLearningProgress,
+    
+    // Teaching mode actions
+    toggleTeachingMode,
+    setTeachingMode: activateTeachingMode,
+    setTeachingModeType,
+    updateTeachingPreferences,
+    saveTeachingMode,
   };
 }

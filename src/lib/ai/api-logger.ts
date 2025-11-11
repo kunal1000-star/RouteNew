@@ -59,6 +59,7 @@ export class ApiUsageLogger {
       query_type: params.queryType,
       tier_used: params.tierUsed,
       fallback_used: params.fallbackUsed,
+      endpoint: this.inferEndpointFromFeature(params.featureName),
       timestamp: new Date()
     };
 
@@ -152,6 +153,58 @@ export class ApiUsageLogger {
   }
 
   /**
+   * Convert user ID to proper UUID using database function
+   */
+  private async convertUserIdToUUID(userId: string): Promise<string> {
+    try {
+      // First try the enhanced function
+      const { data, error } = await supabase
+        .rpc('get_user_uuid', { p_user_id_input: userId });
+
+      if (error) {
+        console.warn('Failed to convert user ID to UUID, using fallback mapping:', error);
+        return this.getFallbackUUIDMapping(userId);
+      }
+
+      return data;
+    } catch (error) {
+      console.warn('Exception converting user ID to UUID:', error);
+      return this.getFallbackUUIDMapping(userId);
+    }
+  }
+
+  /**
+   * Fallback UUID mapping for system users
+   */
+  private getFallbackUUIDMapping(userId: string): string {
+    const mappings: Record<string, string> = {
+      'test-user': '550e8400-e29b-41d4-a716-446655440000',
+      'anonymous-user': '550e8400-e29b-41d4-a716-446655440001',
+      'system-background-jobs': '550e8400-e29b-41d4-a716-446655440002',
+      'diagnostic-test-user': '550e8400-e29b-41d4-a716-446655440003'
+    };
+
+    if (mappings[userId]) {
+      return mappings[userId];
+    }
+
+    // Check if it's already a valid UUID
+    if (userId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)) {
+      return userId;
+    }
+
+    // Generate a deterministic UUID for unknown user IDs
+    return '550e8400-e29b-41d4-a716-44665544' + this.padWithZeros(Math.abs(userId.split('').reduce((a, b) => a + b.charCodeAt(0), 0)).toString(16), 4);
+  }
+
+  /**
+   * Helper function to pad with zeros
+   */
+  private padWithZeros(str: string, length: number): string {
+    return str.padStart(length, '0');
+  }
+
+  /**
    * Flush current batch to database
    */
   private async flushBatch(): Promise<void> {
@@ -163,20 +216,68 @@ export class ApiUsageLogger {
     this.batch = [];
 
     try {
-      // Insert batch into database
-      const { error } = await supabase
-        .from('api_usage_logs')
-        .insert(entriesToFlush);
+      // Convert user IDs to UUIDs and add endpoint information
+      const processedEntries = [];
+      for (const entry of entriesToFlush) {
+        const processedEntry = {
+          ...entry,
+          user_id: await this.convertUserIdToUUID(entry.user_id),
+          endpoint: entry.endpoint || this.inferEndpointFromFeature(entry.feature_name)
+        };
+        processedEntries.push(processedEntry);
+      }
 
-      if (error) {
-        console.error('Failed to insert API usage logs:', error);
-        
-        // Re-add failed entries to batch for retry (but avoid infinite growth)
-        if (this.batch.length < 50) {
-          this.batch.push(...entriesToFlush);
+      // Try to use the enhanced logging function for individual entries
+      let success = true;
+      for (const entry of processedEntries) {
+        try {
+          const { error } = await supabase
+            .rpc('log_api_usage_enhanced', {
+              p_user_id_input: entry.user_id,
+              p_feature_name: entry.feature_name,
+              p_provider_used: entry.provider_used,
+              p_model_used: entry.model_used,
+              p_tokens_input: entry.tokens_input,
+              p_tokens_output: entry.tokens_output,
+              p_latency_ms: entry.latency_ms,
+              p_success: entry.success,
+              p_error_message: entry.error_message,
+              p_query_type: entry.query_type,
+              p_endpoint: entry.endpoint,
+              p_tier_used: entry.tier_used,
+              p_fallback_used: entry.fallback_used
+            });
+
+          if (error) {
+            console.warn('Failed to log individual entry, trying batch insert:', error);
+            success = false;
+            break;
+          }
+        } catch (error) {
+          console.warn('Error logging individual entry:', error);
+          success = false;
+          break;
+        }
+      }
+
+      // If individual logging failed, try batch insert
+      if (!success) {
+        const { error } = await supabase
+          .from('api_usage_logs')
+          .insert(processedEntries);
+
+        if (error) {
+          console.error('Failed to insert API usage logs (batch):', error);
+          
+          // Re-add failed entries to batch for retry (but avoid infinite growth)
+          if (this.batch.length < 50) {
+            this.batch.push(...entriesToFlush);
+          }
+        } else {
+          console.debug(`Successfully logged ${processedEntries.length} API usage entries (batch)`);
         }
       } else {
-        console.debug(`Successfully logged ${entriesToFlush.length} API usage entries`);
+        console.debug(`Successfully logged ${processedEntries.length} API usage entries (individual)`);
       }
     } catch (error) {
       console.error('Error flushing API usage logs batch:', error);
@@ -186,6 +287,26 @@ export class ApiUsageLogger {
         this.batch.push(...entriesToFlush);
       }
     }
+  }
+
+  /**
+   * Infer endpoint from feature name
+   */
+  private inferEndpointFromFeature(featureName: string): string {
+    const featureToEndpoint: Record<string, string> = {
+      'chat': '/api/chat/general',
+      'ai_chat': '/api/chat/general',
+      'study_buddy': '/api/study-buddy',
+      'semantic_search': '/api/ai/semantic-search',
+      'memory_storage': '/api/ai/memory-storage',
+      'embeddings': '/api/ai/embeddings',
+      'suggestions': '/api/suggestions',
+      'user_settings': '/api/user/settings',
+      'google_drive': '/api/google-drive',
+      'diagnostic': '/api/test-debug'
+    };
+
+    return featureToEndpoint[featureName] || '/api/chat/general';
   }
 
   /**

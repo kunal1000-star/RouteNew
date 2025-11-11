@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 // Response interface
@@ -72,8 +72,8 @@ export async function GET(request: NextRequest): Promise<NextResponse<ProfileRes
     if (!userId) {
       console.log('⚠️  Missing userId parameter');
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: 'userId parameter is required',
           data: getDefaultProfileResponse().data
         },

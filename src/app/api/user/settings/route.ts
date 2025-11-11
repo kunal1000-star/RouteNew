@@ -141,6 +141,46 @@ async function validateSettings(settings: Partial<UserSettings>): Promise<{
       }
     }
 
+    if (settings.studyBuddy) {
+      if (!settings.studyBuddy.endpoints || typeof settings.studyBuddy.endpoints !== 'object') {
+        errors.push('studyBuddy.endpoints must be an object');
+      }
+      if (!settings.studyBuddy.globalDefaults || typeof settings.studyBuddy.globalDefaults.provider !== 'string') {
+        errors.push('studyBuddy.globalDefaults.provider must be a string');
+      }
+      if (!settings.studyBuddy.globalDefaults || typeof settings.studyBuddy.globalDefaults.model !== 'string') {
+        errors.push('studyBuddy.globalDefaults.model must be a string');
+      }
+      if (typeof settings.studyBuddy.enableHealthMonitoring !== 'boolean') {
+        errors.push('studyBuddy.enableHealthMonitoring must be a boolean');
+      }
+      if (typeof settings.studyBuddy.testAllEndoints !== 'boolean') {
+        errors.push('studyBuddy.testAllEndoints must be a boolean');
+      }
+
+      // Validate individual endpoints
+      if (settings.studyBuddy.endpoints) {
+        const validEndpoints = ['chat', 'embeddings', 'memoryStorage', 'orchestrator', 'personalized', 'semanticSearch', 'webSearch'];
+        for (const endpoint of validEndpoints) {
+          const endpointConfig = settings.studyBuddy.endpoints[endpoint as keyof typeof settings.studyBuddy.endpoints];
+          if (endpointConfig) {
+            if (typeof endpointConfig.enabled !== 'boolean') {
+              errors.push(`studyBuddy.endpoints.${endpoint}.enabled must be a boolean`);
+            }
+            if (typeof endpointConfig.provider !== 'string') {
+              errors.push(`studyBuddy.endpoints.${endpoint}.provider must be a string`);
+            }
+            if (typeof endpointConfig.model !== 'string') {
+              errors.push(`studyBuddy.endpoints.${endpoint}.model must be a string`);
+            }
+            if (typeof endpointConfig.timeout !== 'number' || endpointConfig.timeout < 5 || endpointConfig.timeout > 120) {
+              errors.push(`studyBuddy.endpoints.${endpoint}.timeout must be a number between 5 and 120`);
+            }
+          }
+        }
+      }
+    }
+
   } catch (error) {
     errors.push('Invalid settings format');
   }

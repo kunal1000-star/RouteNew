@@ -171,7 +171,8 @@ export class AIServiceManager {
             queryDetection,
             appDataContext,
             tier: providerConfig.tier,
-            requestId
+            requestId,
+            preferredModel: (request as any).model
           });
 
           // Record successful request (if logger available)
@@ -424,14 +425,20 @@ export class AIServiceManager {
     appDataContext?: AppDataContext;
     tier: number;
     requestId: string;
+    preferredModel?: string;
   }): Promise<AIServiceManagerResponse> {
-    const { providerName, request, queryDetection, appDataContext, tier, requestId } = params;
+    const { providerName, request, queryDetection, appDataContext, tier, requestId, preferredModel } = params;
     
     // Resolve per-user api key and construct client
-const client = await this.createClientForProvider(providerName, request.userId);
+    const client = await this.createClientForProvider(providerName, request.userId);
 
     // Prepare messages
     const messages = this.prepareMessages(request, queryDetection, appDataContext);
+
+    // Get the model to use (user preferred or default for query type)
+    const modelToUse = this.getModelForQuery(queryDetection.type, providerName, preferredModel);
+    
+    console.log(`[${requestId}] Model selection: provider=${providerName}, userPreferred=${preferredModel}, finalModel=${modelToUse}`);
 
     // Make the API call
     let response: AIServiceManagerResponse;
@@ -440,7 +447,7 @@ const client = await this.createClientForProvider(providerName, request.userId);
       case 'groq':
         response = await client.chat({
           messages,
-          model: this.getModelForQuery(queryDetection.type, 'groq'),
+          model: modelToUse,
           webSearchEnabled: false
         });
         break;
@@ -448,7 +455,7 @@ const client = await this.createClientForProvider(providerName, request.userId);
       case 'gemini':
         response = await client.chat({
           messages,
-          model: this.getModelForQuery(queryDetection.type, 'gemini'),
+          model: modelToUse,
           webSearchEnabled: false
         });
         break;
@@ -456,7 +463,7 @@ const client = await this.createClientForProvider(providerName, request.userId);
       case 'cerebras':
         response = await client.chat({
           messages,
-          model: this.getModelForQuery(queryDetection.type, 'cerebras')
+          model: modelToUse
         });
         break;
         
@@ -464,21 +471,21 @@ const client = await this.createClientForProvider(providerName, request.userId);
         response = await client.chat({
           message: request.message,
           chatHistory: messages.filter(m => m.role !== 'system').map(m => ({ role: m.role, content: m.content })),
-          model: this.getModelForQuery(queryDetection.type, 'cohere')
+          model: modelToUse
         });
         break;
         
       case 'mistral':
         response = await client.chat({
           messages,
-          model: this.getModelForQuery(queryDetection.type, 'mistral')
+          model: modelToUse
         });
         break;
         
       case 'openrouter':
         response = await client.chat({
           messages,
-          model: this.getModelForQuery(queryDetection.type, 'openrouter')
+          model: modelToUse
         });
         break;
         
@@ -490,6 +497,7 @@ const client = await this.createClientForProvider(providerName, request.userId);
     response.tier_used = tier;
     response.query_type = queryDetection.type;
     response.web_search_enabled = false;
+    response.model_used = modelToUse; // Ensure the actual model used is recorded
 
     // Record rate limit usage (if tracker available)
     if (rateLimitTracker && typeof rateLimitTracker.recordRequest === 'function') {
@@ -533,35 +541,41 @@ const client = await this.createClientForProvider(providerName, request.userId);
 
   /**
    * Get appropriate model for query type and provider
+   * Updated with comprehensive free models from all providers
    */
-  private getModelForQuery(queryType: QueryType, provider: AIProvider): string {
+  private getModelForQuery(queryType: QueryType, provider: AIProvider, preferredModel?: string): string {
+    // If user has selected a specific model, use that
+    if (preferredModel) {
+      return preferredModel;
+    }
+
     const modelMappings: Record<QueryType, Record<AIProvider, string>> = {
       time_sensitive: {
-        groq: 'llama-3.3-70b-versatile',
-        gemini: 'gemini-2.0-flash-lite',
-        cerebras: 'llama-3.3-70b',
+        groq: 'llama-3.1-8b-instant', // Free model
+        gemini: 'gemini-2.5-flash', // Latest free model
+        cerebras: 'llama-3.1-8b',
         cohere: 'command',
-        mistral: 'mistral-large-latest',
-        openrouter: 'openai/gpt-3.5-turbo',
-        google: 'gemini-2.0-flash-lite'
+        mistral: 'mistral-7b-instruct', // Free model
+        openrouter: 'minimax/minimax-m2:free', // Free model
+        google: 'gemini-2.5-flash' // Latest free model
       },
       app_data: {
-        groq: 'llama-3.3-70b-versatile',
-        gemini: 'gemini-2.5-flash',
-        cerebras: 'llama-3.3-70b',
+        groq: 'llama-3.1-70b-versatile', // Free model
+        gemini: 'gemini-2.0-flash-lite', // Latest lightweight model
+        cerebras: 'llama-3.1-70b',
         cohere: 'command',
-        mistral: 'mistral-medium-latest',
-        openrouter: 'openai/gpt-3.5-turbo',
-        google: 'gemini-2.5-flash'
+        mistral: 'mistral-7b-instruct', // Free model
+        openrouter: 'openai/gpt-4o-mini', // Free model
+        google: 'gemini-2.0-flash-lite' // Latest lightweight model
       },
       general: {
-        groq: 'llama-3.3-70b-versatile',
-        gemini: 'gemini-2.5-flash',
+        groq: 'llama-3.1-8b-instant', // Free model - default fast model
+        gemini: 'gemini-2.5-flash', // Latest free model
         cerebras: 'llama-3.1-8b',
         cohere: 'command-light',
-        mistral: 'mistral-small-latest',
-        openrouter: 'openai/gpt-3.5-turbo',
-        google: 'gemini-2.5-flash'
+        mistral: 'mistral-7b-instruct', // Free model
+        openrouter: 'anthropic/claude-3-haiku', // Free model
+        google: 'gemini-2.5-flash' // Latest free model
       }
     };
 

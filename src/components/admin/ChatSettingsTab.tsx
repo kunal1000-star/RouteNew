@@ -133,38 +133,60 @@ export function ChatSettingsTab() {
   const loadSettings = async () => {
     try {
       setLoading(true);
+      console.log('🔍 ChatSettingsTab: Starting to load settings...');
+      
       const result = await safeApiCall('/api/admin/chat-settings');
+      console.log('📡 ChatSettingsTab: API response received:', result);
       
       if (result.success) {
         const data = result.data;
-        if (data.success) {
+        console.log('📋 ChatSettingsTab: Data structure:', typeof data, data);
+        
+        if (data && data.success) {
+          console.log('✅ ChatSettingsTab: Settings loaded successfully:', data.data);
           setSettings(data.data);
           setOriginalSettings(data.data);
         } else {
-          throw new Error('Settings response invalid');
+          console.warn('⚠️ ChatSettingsTab: Data.success is false or missing');
+          throw new Error('Settings response invalid: ' + JSON.stringify(data));
         }
       } else {
+        console.error('❌ ChatSettingsTab: API call failed:', result.error);
         throw new Error(result.error || 'Failed to load settings');
       }
     } catch (error) {
-      console.warn('Failed to load chat settings, using defaults:', error);
+      console.error('🚨 ChatSettingsTab: Critical error in loadSettings:', error);
+      console.error('🚨 Error details:', error.message, error.stack);
+      console.log('🔄 ChatSettingsTab: Falling back to default settings');
       setSettings(DEFAULT_SETTINGS);
       setOriginalSettings(DEFAULT_SETTINGS);
     } finally {
       setLoading(false);
+      console.log('⏱️ ChatSettingsTab: Loading complete');
     }
   };
 
   const saveSettings = async () => {
     try {
       setSaving(true);
+      console.log('💾 ChatSettingsTab: Attempting to save settings:', settings);
+      
       const result = await safeApiCall('/api/admin/chat-settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
       });
       
-      if (result.success) {
+      console.log('📡 ChatSettingsTab: Save API response:', result);
+      
+      if (result.success && result.data) {
+        console.log('✅ ChatSettingsTab: Settings saved successfully');
+        setHasUnsavedChanges(false);
+        setOriginalSettings(settings);
+        alert('Chat settings saved successfully!');
+      } else if (result.success) {
+        // Handle case where API returns success but no data
+        console.warn('⚠️ ChatSettingsTab: Save successful but no data returned');
         setHasUnsavedChanges(false);
         setOriginalSettings(settings);
         alert('Chat settings saved successfully!');
@@ -172,7 +194,7 @@ export function ChatSettingsTab() {
         throw new Error(result.error || 'Failed to save settings');
       }
     } catch (error) {
-      console.error('Failed to save settings:', error);
+      console.error('🚨 ChatSettingsTab: Failed to save settings:', error);
       alert('Failed to save settings. Please try again.');
     } finally {
       setSaving(false);
@@ -278,6 +300,22 @@ export function ChatSettingsTab() {
 
 // Individual Settings Components
 function GeneralSettings({ settings, onUpdate }: { settings: ChatSettings; onUpdate: (key: keyof ChatSettings, value: any) => void }) {
+  // Safety check to prevent undefined errors
+  if (!settings) {
+    console.warn('🚨 GeneralSettings: settings is undefined, using defaults');
+    return (
+      <div className="space-y-6">
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <MessageSquare className="h-5 w-5" />
+            Conversation Settings (Loading...)
+          </h3>
+          <p className="text-muted-foreground">Settings are still loading...</p>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Card className="p-6">
@@ -290,7 +328,7 @@ function GeneralSettings({ settings, onUpdate }: { settings: ChatSettings; onUpd
             <Label>Max Conversation Length (messages)</Label>
             <Input
               type="number"
-              value={settings.maxConversationLength}
+              value={settings.maxConversationLength || 50}
               onChange={(e) => onUpdate('maxConversationLength', parseInt(e.target.value))}
               min="10"
               max="1000"

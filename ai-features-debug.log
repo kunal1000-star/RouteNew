@@ -1,0 +1,73 @@
+[2025-11-10T13:03:04.695Z] [START] 🚀 Starting Comprehensive AI Features Debug Test Suite
+[2025-11-10T13:03:04.703Z] [CONFIG] Using User ID: 322531b3-173d-42a9-be4c-770ad92ac8b8
+[2025-11-10T13:03:04.704Z] [CONFIG] Test Timeout: 60000ms
+[2025-11-10T13:03:04.704Z] [CONFIG] Report Directory: c:\Users\kunal\Ruther\ROUTE\test-reports
+[2025-11-10T13:03:04.705Z] [SUITE_START] 
+🔄 Running TypeScript Tests...
+[2025-11-10T13:03:04.705Z] [SUITE] 🔬 Running TypeScript/Node.js Tests
+[2025-11-10T13:03:04.707Z] [ERROR] ❌ ERROR in TypeScript Tests: Cannot find module '../src/test/comprehensive-ai-features-debug-test'
+Require stack:
+- c:\Users\kunal\Ruther\ROUTE\run-debug-ai-tests.js
+[2025-11-10T13:03:04.708Z] [SUITE_FAIL] ❌ TypeScript Tests failed: Cannot find module '../src/test/comprehensive-ai-features-debug-test'
+Require stack:
+- c:\Users\kunal\Ruther\ROUTE\run-debug-ai-tests.js
+[2025-11-10T13:03:04.708Z] [SUITE_START] 
+🔄 Running API Tests...
+[2025-11-10T13:03:04.709Z] [SUITE] 🌐 Running API Endpoint Tests
+[2025-11-10T13:03:04.709Z] [TEST] 🚀 Starting test: Health Check Endpoint
+[2025-11-10T13:03:04.956Z] [RESULT] 📊 Test result: Health Check Endpoint - FAIL (240ms)
+[2025-11-10T13:03:04.957Z] [TEST] 🚀 Starting test: Study Assistant Send
+[2025-11-10T13:03:05.985Z] [RESULT] 📊 Test result: Study Assistant Send - FAIL (1027ms)
+[2025-11-10T13:03:05.985Z] [TEST] 🚀 Starting test: Memory Storage
+[2025-11-10T13:03:06.386Z] [RESULT] 📊 Test result: Memory Storage - FAIL (399ms)
+[2025-11-10T13:03:06.386Z] [TEST] 🚀 Starting test: Semantic Search
+[2025-11-10T13:03:12.497Z] [RESULT] 📊 Test result: Semantic Search - PASS (6109ms)
+[2025-11-10T13:03:12.498Z] [SUITE_SUCCESS] ✅ API Tests completed successfully
+[2025-11-10T13:03:12.498Z] [SUITE_START] 
+🔄 Running Database Tests...
+[2025-11-10T13:03:12.500Z] [SUITE] 🗄️  Running Database Tests
+[2025-11-10T13:03:12.500Z] [TEST] 🚀 Starting test: Table: conversations
+[2025-11-10T13:03:12.501Z] [RESULT] 📊 Test result: Table: conversations - PASS (100ms)
+[2025-11-10T13:03:12.502Z] [TEST] 🚀 Starting test: Table: messages
+[2025-11-10T13:03:12.503Z] [RESULT] 📊 Test result: Table: messages - PASS (100ms)
+[2025-11-10T13:03:12.503Z] [TEST] 🚀 Starting test: Table: study_memories
+[2025-11-10T13:03:12.504Z] [RESULT] 📊 Test result: Table: study_memories - PASS (100ms)
+[2025-11-10T13:03:12.504Z] [TEST] 🚀 Starting test: Table: user_profiles
+[2025-11-10T13:03:12.505Z] [RESULT] 📊 Test result: Table: user_profiles - PASS (100ms)
+[2025-11-10T13:03:12.505Z] [TEST] 🚀 Starting test: Table: ai_suggestions
+[2025-11-10T13:03:12.506Z] [RESULT] 📊 Test result: Table: ai_suggestions - PASS (100ms)
+[2025-11-10T13:03:12.506Z] [TEST] 🚀 Starting test: Table: hallucination_prevention_logs
+[2025-11-10T13:03:12.506Z] [RESULT] 📊 Test result: Table: hallucination_prevention_logs - PASS (100ms)
+[2025-11-10T13:03:12.507Z] [SUITE_SUCCESS] ✅ Database Tests completed successfully
+[2025-11-10T13:03:12.507Z] [SUITE_START] 
+🔄 Running Component Tests...
+[2025-11-10T13:03:12.508Z] [SUITE] 🧩 Running Component Tests
+[2025-11-10T13:03:12.508Z] [TEST] 🚀 Starting test: Component: UniversalChat
+[2025-11-10T13:03:12.509Z] [RESULT] 📊 Test result: Component: UniversalChat - PASS (50ms)
+[2025-11-10T13:03:12.510Z] [TEST] 🚀 Starting test: Component: UniversalChatEnhanced
+[2025-11-10T13:03:12.511Z] [RESULT] 📊 Test result: Component: UniversalChatEnhanced - PASS (50ms)
+[2025-11-10T13:03:12.511Z] [TEST] 🚀 Starting test: Component: UniversalChatWithFeatureFlags
+[2025-11-10T13:03:12.512Z] [RESULT] 📊 Test result: Component: UniversalChatWithFeatureFlags - PASS (50ms)
+[2025-11-10T13:03:12.513Z] [TEST] 🚀 Starting test: Component: StudyBuddy
+[2025-11-10T13:03:12.513Z] [RESULT] 📊 Test result: Component: StudyBuddy - PASS (50ms)
+[2025-11-10T13:03:12.513Z] [TEST] 🚀 Starting test: Component: AIFeaturesDashboard
+[2025-11-10T13:03:12.513Z] [RESULT] 📊 Test result: Component: AIFeaturesDashboard - PASS (50ms)
+[2025-11-10T13:03:12.514Z] [SUITE_SUCCESS] ✅ Component Tests completed successfully
+[2025-11-10T13:03:12.515Z] [REPORT] 
+📊 COMPREHENSIVE AI FEATURES TEST SUMMARY
+[2025-11-10T13:03:12.515Z] [REPORT] NaN
+[2025-11-10T13:03:12.515Z] [REPORT] Total Duration: 7819ms
+[2025-11-10T13:03:12.516Z] [REPORT] Total Tests: 15
+[2025-11-10T13:03:12.516Z] [REPORT] Passed: 12
+[2025-11-10T13:03:12.517Z] [REPORT] Failed: 3
+[2025-11-10T13:03:12.517Z] [REPORT] Success Rate: 80.0%
+[2025-11-10T13:03:12.517Z] [REPORT] Status: ⚠️ SOME TESTS FAILED
+[2025-11-10T13:03:12.518Z] [REPORT] 
+❌ ERRORS ENCOUNTERED:
+[2025-11-10T13:03:12.518Z] [REPORT] 1. TypeScript Tests: Cannot find module '../src/test/comprehensive-ai-features-debug-test'
+Require stack:
+- c:\Users\kunal\Ruther\ROUTE\run-debug-ai-tests.js
+[2025-11-10T13:03:12.518Z] [REPORT] 
+💾 Detailed report saved to: c:\Users\kunal\Ruther\ROUTE\test-reports\debug-test-results-1762779792514.json
+[2025-11-10T13:03:12.519Z] [REPORT] 📝 Log file: c:\Users\kunal\Ruther\ROUTE\ai-features-debug.log
+[2025-11-10T13:03:12.519Z] [COMPLETE] 🏁 Comprehensive AI Features Debug Test Suite Complete

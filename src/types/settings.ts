@@ -9,6 +9,7 @@ export interface UserSettings {
   notifications: NotificationSettings;
   privacy: PrivacyControls;
   usage: UsageMonitoring;
+  studyBuddy: StudyBuddySettings;
   createdAt: string;
   updatedAt: string;
 }
@@ -151,6 +152,57 @@ export interface UsageMonitoring {
     showTrends: boolean;
     showPredictions: boolean;
   };
+}
+
+// Tab 6: Study Buddy AI Endpoint Configuration
+export interface StudyBuddySettings {
+  endpoints: {
+    chat: EndpointConfig;
+    embeddings: EndpointConfig;
+    memoryStorage: EndpointConfig;
+    orchestrator: EndpointConfig;
+    personalized: EndpointConfig;
+    semanticSearch: EndpointConfig;
+    webSearch: EndpointConfig;
+  };
+  globalDefaults: {
+    provider: string;
+    model: string;
+  };
+  testAllEndoints: boolean;
+  enableHealthMonitoring: boolean;
+}
+
+export interface EndpointConfig {
+  enabled: boolean;
+  provider: string;
+  model: string;
+  timeout: number;
+  retryAttempts: number;
+  fallbackProvider?: string;
+  fallbackModel?: string;
+  lastTested?: string;
+  testStatus?: 'success' | 'failed' | 'pending';
+  error?: string;
+}
+
+export interface EndpointTestResult {
+  endpoint: string;
+  success: boolean;
+  responseTime: number;
+  error?: string;
+  timestamp: string;
+}
+
+export interface BulkTestResult {
+  results: EndpointTestResult[];
+  summary: {
+    total: number;
+    successful: number;
+    failed: number;
+    successRate: number;
+  };
+  timestamp: string;
 }
 
 // API Response Types
@@ -337,6 +389,79 @@ export const defaultUserSettings: UserSettings = {
       showTrends: true,
       showPredictions: true
     }
+  },
+  studyBuddy: {
+    endpoints: {
+      chat: {
+        enabled: true,
+        provider: 'gemini',
+        model: 'gemini-2.0-flash',
+        timeout: 30,
+        retryAttempts: 3,
+        fallbackProvider: 'mistral',
+        fallbackModel: 'mistral-medium-latest'
+      },
+      embeddings: {
+        enabled: true,
+        provider: 'cohere',
+        model: 'embed-english-v3.0',
+        timeout: 30,
+        retryAttempts: 3,
+        fallbackProvider: 'openrouter',
+        fallbackModel: 'nomic-embed-text-v1.5'
+      },
+      memoryStorage: {
+        enabled: true,
+        provider: 'groq',
+        model: 'llama3-8b-8192',
+        timeout: 30,
+        retryAttempts: 3,
+        fallbackProvider: 'mistral',
+        fallbackModel: 'mistral-small-latest'
+      },
+      orchestrator: {
+        enabled: true,
+        provider: 'mistral',
+        model: 'mistral-large-latest',
+        timeout: 30,
+        retryAttempts: 3,
+        fallbackProvider: 'gemini',
+        fallbackModel: 'gemini-1.5-flash'
+      },
+      personalized: {
+        enabled: true,
+        provider: 'gemini',
+        model: 'gemini-1.5-flash',
+        timeout: 30,
+        retryAttempts: 3,
+        fallbackProvider: 'mistral',
+        fallbackModel: 'mistral-large-latest'
+      },
+      semanticSearch: {
+        enabled: true,
+        provider: 'cohere',
+        model: 'embed-english-v3.0',
+        timeout: 30,
+        retryAttempts: 3,
+        fallbackProvider: 'openrouter',
+        fallbackModel: 'nomic-embed-text-v1.5'
+      },
+      webSearch: {
+        enabled: true,
+        provider: 'gemini',
+        model: 'gemini-2.0-flash',
+        timeout: 30,
+        retryAttempts: 3,
+        fallbackProvider: 'mistral',
+        fallbackModel: 'mistral-medium-latest'
+      }
+    },
+    globalDefaults: {
+      provider: 'gemini',
+      model: 'gemini-2.0-flash'
+    },
+    testAllEndoints: true,
+    enableHealthMonitoring: true
   },
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString()

@@ -1,0 +1,118 @@
+{
+  "database": {
+    "tierUsedColumn": {
+      "exists": false,
+      "error": "Could not find the table 'public.users' in the schema cache"
+    },
+    "apiUsageLogs": {
+      "accessible": true,
+      "error": null
+    },
+    "conversations": {
+      "accessible": false,
+      "error": "Could not find the table 'public.conversations' in the schema cache"
+    },
+    "memories": {
+      "accessible": false,
+      "error": "Could not find the table 'public.memories' in the schema cache"
+    }
+  },
+  "api": {
+    "AI Chat": {
+      "status": 200,
+      "accessible": true,
+      "error": null
+    },
+    "Memory Search": {
+      "status": 400,
+      "accessible": true,
+      "error": "HTTP 400"
+    },
+    "Study Buddy": {
+      "status": 401,
+      "accessible": true,
+      "error": "HTTP 401"
+    },
+    "Health Check": {
+      "status": 200,
+      "accessible": true,
+      "error": null
+    }
+  },
+  "memory": {
+    "storage": {
+      "working": false,
+      "error": "Could not find the table 'public.memories' in the schema cache"
+    },
+    "search": {
+      "working": false,
+      "error": "Could not find the table 'public.memories' in the schema cache"
+    }
+  },
+  "studyBuddy": {
+    "chatFunction": {
+      "working": true,
+      "status": 401,
+      "error": "HTTP 401"
+    },
+    "profile": {
+      "accessible": false,
+      "error": "invalid input syntax for type uuid: \"test-validation-user\""
+    }
+  },
+  "hallucination": {
+    "layer1": {
+      "working": false,
+      "error": "Could not find the table 'public.query_classifications' in the schema cache",
+      "table": "query_classifications"
+    },
+    "layer2": {
+      "working": true,
+      "error": null,
+      "table": "conversation_memory"
+    },
+    "layer3": {
+      "working": true,
+      "error": null,
+      "table": "fact_relationships"
+    },
+    "layer4": {
+      "working": false,
+      "error": "Could not find the table 'public.user_feedback' in the schema cache",
+      "table": "user_feedback"
+    },
+    "layer5": {
+      "working": false,
+      "error": "Could not find the table 'public.hallucination_logs' in the schema cache",
+      "table": "hallucination_logs"
+    }
+  },
+  "systemErrors": {
+    "recentLogs": {
+      "accessible": false,
+      "errorCount": 0,
+      "error": "column api_usage_logs.created_at does not exist"
+    },
+    "rlsStatus": {
+      "checkable": true,
+      "accessible": false,
+      "error": "Could not find the table 'public.conversations' in the schema cache"
+    }
+  },
+  "realUserScenarios": {
+    "thermodynamicsTest": {
+      "working": true,
+      "status": 401,
+      "hasResponse": true,
+      "error": "HTTP 401"
+    }
+  },
+  "summary": {
+    "totalDuration": 21901,
+    "totalTests": 17,
+    "passedTests": 8,
+    "healthPercentage": 47,
+    "timestamp": "2025-11-11T03:01:22.474Z",
+    "status": "CRITICAL"
+  }
+}
