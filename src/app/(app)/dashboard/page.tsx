@@ -19,7 +19,7 @@ import { calculateAndApplyTimeAdjustment, formatDelay, formatPenalty } from '@/l
 import { AISuggestionsDashboard } from '@/components/ai/AISuggestionsDashboard';
 import AIFeaturesDashboard from '@/components/ai/AIFeaturesDashboard';
 import MLStudyInsights from '@/components/ai/MLStudyInsights';
-import { SimpleAnalyticsDashboard } from '@/components/ai/EnhancedAnalytics';
+import EnhancedAnalyticsDashboard from '@/components/ai/EnhancedAnalytics';
 
 interface TimeAdjustmentNotification {
   show: boolean;

@@ -25,6 +25,8 @@ import { cn } from '@/lib/utils';
 import type { ChatMessage } from '@/types/study-buddy';
 import { useToast } from '@/hooks/use-toast';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { SaveButton } from './SaveButton';
+import { useGoogleDriveSave } from '@/hooks/useGoogleDriveSave';
 
 interface MessageBubbleProps {
   message: ChatMessage;
